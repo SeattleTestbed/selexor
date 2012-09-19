@@ -1,0 +1,10 @@
+City file is taken from MaxMind, Inc.
+The provided copy was taken 06.16.2012.
+The latest file can be found here: 
+http://www.maxmind.com/app/worldcities
+
+Unfortunately, I cannot recall where the included country file was obtained from.
+However, a copy without the 3-letter codes can be obtained here: 
+http://www.iso.org/iso/country_codes/iso_3166_code_lists.htm
+
+You may use the included formatter programs to format the files obtained from the above URIs to a format that SeleXor can use.

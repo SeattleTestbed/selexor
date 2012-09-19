@@ -1,0 +1,140 @@
+@charset "utf-8";
+/********************************************
+<Filename>
+  web_ui.css
+<Purpose>
+  Main stylesheet for the SeleXor web UI.
+
+Colors Index
+FF0000  Red
+000000  Black
+CCCCCC  Light Gray
+AAAAAA  Medium-Light Gray
+999999  Medium Gray
+009000  Green
+*********************************************/
+
+
+/********************************************
+Setting a minimum width prevents long rule definitions
+from making the page appear crumpled.
+*********************************************/
+body {
+	min-width: 1024px;
+}
+
+h1#selexor_title {
+  font-size:24px;	
+	margin: 1px;
+	margin-bottom: 0px;
+}
+
+h2#selexor_subtitle {
+	margin: 0px 0px 5px;
+	font-style: oblique;
+}
+
+/********************************************
+A rounded container.
+*********************************************/
+div.capsule {
+	border-radius: 10px;
+	border: #000000 thin solid;
+	margin: 5px;
+	padding: 10px;
+	background-color: #CCCCCC;
+}
+
+/********************************************
+Capsule containing the send host request button.
+*********************************************/
+input.authentication_input {
+	width: 32em;
+}
+
+span#hosts_remaining_span {
+	font-weight: bold;
+}
+
+/********************************************
+Buttons for adding/removing rules
+*********************************************/
+input.condition_count_modifier {
+	margin-left: 2px;
+}
+
+/********************************************
+Group definition alternating background colors
+*********************************************/
+tr.group_definition:nth-child(2n) {
+	background-color: #999999;
+}
+tr.group_definition:nth-child(2n+1) {
+	background-color: #AAAAAA;
+}
+
+.rule_span {
+	display: table-row;
+	margin-bottom: 2px;
+}
+
+/********************************************
+Capsule containing the send host request button.
+*********************************************/
+#acquire_capsule {
+  display: inline-block;
+}
+
+h2 {
+	font-size:20px;	
+	margin: 1px;
+}
+
+/********************************************
+Adds space around select and input objects
+that are inside a group definition.
+*********************************************/
+.group_definition select:not(first-child),
+.group_definition input:not(first-child):not([type='button']) {
+  margin-left: 2px;
+	margin-right: 2px;
+}
+
+/********************************************
+Style to use when the request is ready to be 
+sent to the server.
+*********************************************/
+div.request_ready {
+	background-color: #009000;
+}
+
+/********************************************
+Tooltip images
+*********************************************/
+img.tooltip_img {
+	margin-left: 4px;
+  margin-right: 4px;
+}
+
+/********************************************
+Text input fields for numbers
+*********************************************/
+input[type='text'].numeric_text {
+  width: 8ex;
+}
+/********************************************
+Mark certain fields red if they have errors.
+Don't mark buttons red.
+Don't mark error nodes red, either. Error nodes contain error tooltips. 
+*********************************************/
+:not([type='button']):not(.error_node).has_error {
+  background-color: #FF0000;
+}
+
+.float_right {
+  float: right;
+}
+
+img {
+  vertical-align: middle;
+}
