@@ -146,7 +146,7 @@ def _get_next_group_to_resolve(requestdict):
 
 
 
-def connect_to_clearinghouse(authdata, xmlrpc_url = None):
+def connect_to_clearinghouse(authdata, allow_ssl_insecure, xmlrpc_url = None):
   '''
   <Purpose>
     Wrapper for a SeattleClearinghouseClient constructor.
@@ -179,7 +179,8 @@ def connect_to_clearinghouse(authdata, xmlrpc_url = None):
         username = username,
         api_key = apikey,
         xmlrpc_url = xmlrpc_url,
-        private_key_string = private_key_string)
+        private_key_string = private_key_string,
+        allow_ssl_insecure = allow_ssl_insecure)
   except Exception:
     print traceback.format_exc()
     raise
@@ -197,6 +198,7 @@ class SelexorServer:
                geoip_server_uri = None,
                begin_probing = True,
                update_threadcount = None,
+               allow_ssl_insecure = False,
                probe_delay = 300):
     '''
     <Purpose>
@@ -303,7 +305,7 @@ class SelexorServer:
 
       released_vesselhandles = []
 
-      client = connect_to_clearinghouse(authdata, self.clearinghouse_xmlrpc_uri)
+      client = connect_to_clearinghouse(authdata, self.allow_ssl_insecure, self.clearinghouse_xmlrpc_uri)
       resource_info = client.get_resource_info()
       print resource_info
       print "Vessels:"
@@ -578,7 +580,7 @@ class SelexorServer:
 
     if request_data['status'] == 'accepted':
       try:
-        client = connect_to_clearinghouse(authinfo, self.clearinghouse_xmlrpc_uri)
+        client = connect_to_clearinghouse(authinfo, self.allow_ssl_insecure, self.clearinghouse_xmlrpc_uri)
       except selexorexceptions.SelexorException, e:
         request_data['status'] = 'error'
         request_data['error'] = str(e)
