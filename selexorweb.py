@@ -80,6 +80,7 @@ def main():
       clearinghouse_xmlrpc_uri = context['configuration']['xmlrpc_url'],
       geoip_server_uri = context['configuration']['geoip_url'],
       begin_probing = True,
+      allow_ssl_insecure = context['configuration']['allow_ssl_insecure'],
       update_threadcount = context['configuration']['num_probe_threads'],
       probe_delay = context['configuration']['probe_delay'])
 
@@ -135,7 +136,8 @@ def _load_config_with_file(configname, configuration):
     'http_port': int,
     'advertise_port': int,
     'num_probe_threads': int,
-    'probe_delay': int
+    'probe_delay': int,
+    'allow_ssl_insecure': bool,
   }
 
   context['configuration']['server_name'] = configname
