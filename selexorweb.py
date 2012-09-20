@@ -73,6 +73,7 @@ def main():
 
   nodestate_transition_key = rsa_repy.rsa_file_to_publickey(context['configuration']['nodestate_transition_key_fn'])
 
+  print context['configuration']['allow_ssl_insecure']
   context['selexor_server'] = selexorserver.SelexorServer(
       instance_name,
       advertise_port = context['configuration']['advertise_port'],
