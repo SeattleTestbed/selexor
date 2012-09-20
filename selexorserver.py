@@ -242,6 +242,8 @@ class SelexorServer:
 
     self._accepting_requests = True
     self._running = True
+    
+    self.allow_ssl_insecure = allow_ssl_insecure
 
     # The threads that are involved in resolving group requests.
     # We keep track of these to ensure we stop resolving groups before writing
