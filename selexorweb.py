@@ -348,7 +348,7 @@ class SelexorHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     '''
     response_dict = {}
     try:
-      client = selexorserver.connect_to_clearinghouse(data, context['configuration']['xmlrpc_url'])
+      client = selexorserver.connect_to_clearinghouse(data, context['configuration']['xmlrpc_url']['allow_ssl_insecure'], context['configuration']['xmlrpc_url'])
       accinfo = client.get_account_info()
       acquired_resources = client.get_resource_info()
 
