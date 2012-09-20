@@ -1,0 +1,114 @@
+= !SeleXor =
+!SeleXor is an advanced vessel selection tool. It gives users finer control over the vessels that they may acquire from Clearinghouse. It is currently accessible through a web browser. 
+
+[[TOC(inline)]]
+
+ == Setup ==
+The following is required in order to setup !SeleXor for your clearinghouse:
+ * [wiki:SeattleGeniClientLib Seattle Clearinghouse XML-RPC Client]
+ * Seattle Experiment Library
+ * [http://chandlerproject.org/Projects/MeTooCrypto M2Crypto]
+
+
+Additionally, you must also have the following files (paths are relative to the current directory):
+ * .\cacert.pem - A PEM file containing CA certificates. You may obtain this file [http://curl.haxx.se/ca/cacert.pem here]
+ * .\lookup\city.txt - City validation file
+ * .\lookup\country.txt - Country validation file
+ * .\[instance_name].conf - A selexor configuration file. See Usage for more information.
+
+City and Country validation files contain a list of all known cities and countries. These files are used to detect bad location requests so that !SeleXor does not attempt to acquire vessels from a location that does not exist. As the city file can be quite large, these files are included in a ZIP archive, which you have to decompress. On the event that the included files are outdated, you may acquire the raw files from the links provided below, and parse them using the included validation file formatter.
+
+!SeleXor will expect the validation files to be tab-separated in the following format, containing one location entry per line:
+{{{
+identifier alias1 alias2 ...
+}}}
+For countries, the identifier is the country's 2-letter code according to ISO 3166. This file can be obtained [http://www.iso.org/iso/list-en1-semic-3.txt here]. 
+For cities, the identifier is the city's name in ISO 8859-1 encoding. This file can be obtained [http://www.maxmind.com/app/worldcities here]
+
+A program is included that can parse files that are obtained from the above sources. Look in the lookup folder for more information.
+
+ == Usage ==
+!SeleXor can both be used as a standalone program via the command line, or imported and used as a part of a larger program. 
+
+There are several components to SeleXor. To start an instance of SeleXor, start the web server:
+{{{
+$ python selexorweb.py [instance_name]
+}}}
+
+SeleXor will expect a file named '[instance_name].conf'. It will be used to control the behavior of SeleXor. An example of what the file should contain is shown below:
+
+{{{
+# SELEXOR CONFIGURATION
+http_ip:127.0.0.1
+http_port:8888
+advertise_port:1224
+num_probe_threads:16
+# SUBSTITUTIONS
+CLEARINGHOUSE_NAME:Seattle Clearinghouse
+CLEARINGHOUSE_URL:https://seattlegeni.cs.washington.edu/geni
+}}}
+
+In web_ui_template.html, you may add ![[PARAMETER_NAME]] to indicate where you would want a substitution to happen, just add PARAMETER_NAME in the list of substitutions in this configuration file. To prevent collisions with future configuration options, all substitutions should be all in capitals.
+
+Users may access selexorweb.py through the port specified in '[instance_name].conf'. 
+
+ == Backend ==
+There are four main components to SeleXor. They consist of the main server, http server, database, and the rule parser.
+
+ === Main server ===
+ 
+SeleXor's main server is responsible for the integration of the various other components. 
+
+ === HTTP server ===
+SeleXor's HTTP server is an interface to the main server. This is an example of how SeleXor's main server can be used within a larger system. Currently, this is the only way that a user can access SeleXor.
+
+ === Database ===
+SeleXor's database stores all the data that is used to process user requests. It is self-updating, refreshing its data on a level that is configurable by the administrator. 
+
+ === Rule parser ===
+The rule parser is the most important aspect of SeleXor. This is where the rule definitions are stored, and used by SeleXor to filter out unwanted vessels. Vessel-level rules may only use information readily accessible on a single vessel, such as its IP address, geographical location, uptime, etc. Group-level rules use information that must be calculated based on the vessels that are in it, such as average latency, maximum distance between vessels, the number of different cities that the vessels are from, etc. When resolving vessel requests, SeleXor will first apply all vessel-level rules first, then work with group-level rules. The rule parser is designed so that additional rules can be easily added without having to tinker with the rest of the system. 
+
+ ==== Adding new Rules ====
+ 
+When adding new rules, you need to do two things. First, you need to define the callback function to be used for the rule. Vessel rules must accept 4 parameters, while group rules must accept 5.
+  handleset:
+    A set of handle handles.
+  database:
+    The database to use. This is a selexordatabase.
+  invert: (bool)
+    This indicates if the rule should be inverted.
+  parameters: (dictionary)
+    A dictionary of parameters that the rule expects. In general, each parameter should only take one value, not a collection. This limitation may be removed in the future.
+  acquired vessels (group only): (list of vessel handles)
+    A list of vessel handles that should be considered as the active group. 
+
+Additionally, a parameter preprocessor for the rule can also be specified. This allows you to check parameters for right values, and convert parameters to types that you expect. This preprocessor should take one dictionary of parameters, and return the dictionary of preprocessed parameters. If there are any bad parameters, simply raise an exception and an error message will be passed to the user.
+
+After this is done, simply register it using the register_callback() function. This function prevents accidental overriding of built-in rules. You can de-register a rule using the deregister_callback() function.
+{{{
+#!python
+def ip_subnet_parser(handleset, database, invert, parameters):
+  good_handles = set()
+  for handle in handleset:
+    good_subnet = is_handle_ip_in_subnet(handle, parameters['subnet'])
+    # Invert if needed
+    if invert ^ good_subnet:
+      good_handles.add(handle)
+  return good_handles
+
+def ip_subnet_preprocessor(parameters):
+  subnettokens = parameters['ip'].split('.')
+  if len(subnettokens) != 4:
+    raise ValueError("Invalid IP address")
+  for subnettoken in subnettokens:
+    if int(subnettoken) not in range(255):
+      raise ValueError("Invalid IP address")
+  if not valid_subnet_mask(parameters['subnet'])
+    raise ValueError("Invalid subnet mask")
+
+  parameters['subnet'] = get_subnet_from_ip_and_subnet_mask(parameters['ip'], parameters['mask'])
+  return parameters
+  
+
+register_callback('ip_subnet', ip_subnet_parser, ip_subnet_preprocessor)
+}}}

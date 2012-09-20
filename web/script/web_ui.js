@@ -633,9 +633,6 @@ function authenticate() {
   }
   var userinfo = get_user_data()
 
-  var progress_image = document.createElement('img')
-  progress_image.src = PROGRESS_IMAGE_SRC
-  $('#authentication_span').after(progress_image)
   $('#authentication_progress').css('display', 'inline')
   g_authenticated = false
   $.ajax({
@@ -675,7 +672,6 @@ function authenticate() {
     update_remaining_host_count();
     $('#authentication_progress').hide()
     $('.vessel_selection').val(0)
-    $(progress_image).remove()
   });
 
 }

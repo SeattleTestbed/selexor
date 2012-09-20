@@ -42,7 +42,7 @@ def get_country_id(countryname):
 
 
 def load_ids(idtype):
-  id_file = open(os.path.abspath('lookup\\' + idtype + '.txt'), 'r')
+  id_file = open('./lookup/' + idtype + '.txt', 'r')
   id_map = {}
 
   line = id_file.readline().lower()

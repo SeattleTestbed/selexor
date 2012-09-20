@@ -48,7 +48,7 @@ logger.addHandler(log_filehandler)
 
 context = {}
 context['INDEX_FILE'] = 'web_ui_template.html'
-context['WEB_PATH'] = 'web\\'
+context['WEB_PATH'] = './web/'
 
 def main():
   if len(sys.argv) != 2:
@@ -57,7 +57,7 @@ def main():
     return
 
   instance_name = sys.argv[1]
-  context['WEB_PATH'] = os.path.abspath(context['WEB_PATH']) + '\\'
+  # context['WEB_PATH'] = os.path.abspath(context['WEB_PATH']) + '\\'
 
   # Load the default configuration file, then overwrite the configuration with
   # the data stored in the server-specific configuration file.

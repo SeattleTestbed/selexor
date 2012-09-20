@@ -272,16 +272,6 @@ class SelexorServer:
     self.database.shutdown()
 
 
-##  def accepting_requests(self):
-##    return self._accepting_requests
-
-
-  def _compile_nodeinfolist_from_vessel_handles(self, handles):
-    nodeinfolist = []
-    
-    return nodeinfolist
-
-
   def release_vessels(self, authdata, vessels, remoteip):
     '''
     <Purpose>
