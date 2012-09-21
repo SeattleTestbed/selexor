@@ -86,7 +86,7 @@ def main():
       probe_delay = context['configuration']['probe_delay'])
 
   http_thread.start()
-  print "Listening for connections on", context['configuration']['http_ip'] + ':' + context['configuration']['http_port']
+  print "Listening for connections on", context['configuration']['http_ip'] + ':' + str(context['configuration']['http_port'])
 
   # Run until:
   #   CTRL+C is pressed, OR
