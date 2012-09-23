@@ -422,13 +422,7 @@ class database:
         if not node_nmhandle:
           nmclient_destroyhandle(node_nmhandle)
         self._bad_node_locations.append(nodelocation)
-        errstr = str(e)
-        if  "timed out" in errstr or \
-            'No connection could be made because the target machine actively refused it' in errstr:
-          continue
         logger.error("Unknown error contacting " + nodelocation + traceback.format_exc())
-      except Exception, e:
-        logger.error("Unknown Error contacting " + nodelocation + traceback.format_exc())
 
       nmclient_destroyhandle(node_nmhandle)
 

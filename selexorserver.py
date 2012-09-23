@@ -276,7 +276,7 @@ class SelexorServer:
     self.database.shutdown()
 
 
-  def release_vessels(self, authdata, vessels, remoteip):
+  def release_vessels(self, authdata, vessels_to_release, remoteip):
     '''
     <Purpose>
       Returns the # of vessels released
@@ -299,28 +299,31 @@ class SelexorServer:
     try:
       username = authdata.keys()[0]
       identity = (username, remoteip)
-      logger.info(str(identity) + "> Release: " + str(vessels))
+      logger.info(str(identity) + "> Release: " + str(vessels_to_release))
 
       # There's nothing to do if there aren't any vessels to release
-      if not vessels:
+      if not vessels_to_release:
         return 0
-
-      released_vesselhandles = []
 
       client = connect_to_clearinghouse(authdata, self.allow_ssl_insecure, self.clearinghouse_xmlrpc_uri)
       resource_info = client.get_resource_info()
-      print resource_info
-      print "Vessels:"
-      print vessels
       found_vesselhandles = []
       for resource_dict in resource_info:
         nmvesselhandle = resource_dict['node_ip'] + ":" + str(resource_dict['node_port']) + ':' + resource_dict['vessel_id']
-        if nmvesselhandle in vessels:
+        if nmvesselhandle in vessels_to_release:
           found_vesselhandles.append(resource_dict['handle'])
-      client.release_resources(found_vesselhandles)
-
-      # Do we need to check if a vessel failed to release?
-      # Maybe it means that a vessel has gone offline/is now invalid.
+          vessels_to_release.remove(nmvesselhandle)
+          
+      if found_vesselhandles:
+        client.release_resources(found_vesselhandles)
+        logger.info(str(identity) + " Found these vessels through xmlrpc client: \n" + str(found_vesselhandles))
+      
+      # Look up the handles if there are any remaining vessels
+      for vessel in vessels_to_release:
+        # Do we need to check if a vessel failed to release?
+        # Maybe it means that a vessel has gone offline/is now invalid.
+        logger.info(str(identity) + " Looking up + releasing: " + vessel)
+        client.release_resources([get_handle_from_nodehandle(vessel)])
 
       # Assume all the vessels were released successfully
       self.database.mark_handles_as_unallocated(found_vesselhandles)
@@ -424,6 +427,7 @@ class SelexorServer:
             in_group_retry_count < MAX_IN_GROUP_RETRIES:
 
         if not self._running:
+          # Stop if we receive a quit message
           break
 
         if node['pass'] < MAX_PASSES_PER_NODE:
@@ -678,70 +682,6 @@ class SelexorServer:
     request_data['status'] = 'complete'
 
 
-##  def _request_data_from_string(self, identity, raw_request):
-##    '''
-##    <Purpose>
-##      Checks that the given request is valid.
-##    <Arguments>
-##      raw_request:
-##        A string representing a selexor host request.
-##    <Exceptions>
-##      InvalidRequestStringError
-##    <Side Effects>
-##      None
-##    <Returns>
-##      A dictionary containing the following keys:
-##        'groups': (list of Nodes)
-##          A dictionary containing all groups.
-##        'num_vessels':
-##          The total number of vessels requested.
-##        'port':
-##          The port to request the vessels on.
-##
-##    '''
-##    content_cell = 1
-##    first_rule_cell = 2
-##    requests = raw_request.split(';')
-##    groups = {}
-##    has_errors = False
-##
-##    for request in requests:
-##      # Skip empty lines
-##      if not request:
-##        continue
-##
-##      tokens = request.split(":")
-##      node_id = tokens[0]
-##
-##      new_group = {
-##          'id': node_id,
-##          'rules': {},
-##          'status': 'unresolved',
-##          'allocate': int(tokens[1]),
-##          'acquired': [],
-##          'pass': 0,
-##          }
-##
-##      try:
-####        rules = parser.rules_from_strings(tokens[first_rule_cell:])
-##        rules = parser.preprocess_rules(rules)
-##        new_group['rules'] = rules
-##      except Exception, e:
-##        new_group['error'] = str(e)        
-##        logger.info(str(identity) + ": Error while parsing rulestring for node " + node_id + '\n' + traceback.format_exc())
-##        has_errors = True
-##      except:
-##        new_group['error'] = "An internal error occurred."
-##        logger.error(str(identity) + ": Error while parsing rulestring for node " + node_id + '\n' + traceback.format_exc())
-##        has_errors = True
-##      groups[node_id] = new_group
-##
-##    if has_errors:
-##      status = "error"
-##    else:
-##      status = 'accepted'
-##    return {'groups': groups, 'status': status}
-
   def _validate_request(self, identity, request):
     '''
     <Purpose>
@@ -834,8 +774,9 @@ def get_handle_from_nodehandle(nodehandle):
   port = int(port)
   nmhandle = fastnmclient.nmclient_createhandle(nodeid, port)
   try:
-    handleinfo = fastnmclient.nmclient_get_handle_info(nmhandle)
+##    handleinfo = fastnmclient.nmclient_get_handle_info(nmhandle)
+    vesseldict = fastnmclient.nmclient_getvesseldict(nmhandle)
   finally:
     fastnmclient.nmclient_destroyhandle(nmhandle)
-  return handleinfo['identity'] + ':' + vesselname
+  return rsa_repy.rsa_publickey_to_string(vesseldict['nodekey']) + ':' + vesselname
 
