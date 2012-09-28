@@ -83,12 +83,22 @@ def main():
 
   nodestate_transition_key = rsa_repy.rsa_file_to_publickey(context['configuration']['nodestate_transition_key_fn'])
   
+##  context['selexor_server'] = selexor_server = selexorserver.SelexorServer(
+##      instance_name,
+##      advertise_port = context['configuration']['advertise_port'],
+##      nodestate_transition_key = nodestate_transition_key,
+##      clearinghouse_xmlrpc_uri = context['configuration']['xmlrpc_url'],
+##      geoip_server_uri = context['configuration']['geoip_url'],
+##      begin_probing = True,
+##      allow_ssl_insecure = context['configuration']['allow_ssl_insecure'],
+##      update_threadcount = context['configuration']['num_probe_threads'],
+##      probe_delay = context['configuration']['probe_delay'])
   context['selexor_server'] = selexor_server = selexorserver.SelexorServer(
       instance_name,
       advertise_port = context['configuration']['advertise_port'],
       nodestate_transition_key = nodestate_transition_key,
       clearinghouse_xmlrpc_uri = context['configuration']['xmlrpc_url'],
-      geoip_server_uri = context['configuration']['geoip_url'],
+##      geoip_server_uri = context['configuration']['geoip_url'],
       begin_probing = True,
       allow_ssl_insecure = context['configuration']['allow_ssl_insecure'],
       update_threadcount = context['configuration']['num_probe_threads'],

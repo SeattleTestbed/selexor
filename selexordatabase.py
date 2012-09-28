@@ -271,7 +271,8 @@ class database:
     # Gets all the node_ids that are being actively advertised
     nodelocations = advertise_lookup(self._nodestate_transition_key, maxvals = num_resources_to_get)
 
-    self._nodes_to_check = nodelocations[:num_resources_to_get]
+    self._nodes_to_check = deque(nodelocations[:num_resources_to_get])
+      
     self._checked_vessels = []
     self._bad_node_locations = []
     self._nat_nodes = []
@@ -362,7 +363,7 @@ class database:
         break
       
       if len(self._nodes_to_check) % 50 == 0:
-        print len(self._nodes_to_check), "nodes remaining!"
+        logger.info(str(len(self._nodes_to_check)) + "nodes remaining!")
       
       nodelocation = self._nodes_to_check.pop()
       nodeinfo = get_node_ip_port_from_nodelocation(nodelocation)
@@ -374,21 +375,24 @@ class database:
         continue
 
       # Handle all node-level information here
+      geoinfo = {}
       try:
         geoinfo = geoip_record_by_addr(nodeinfo['id'])
       except Exception, e:
         if "Unable to contact the geoip server" in str(e):
-          # Try it again later
-          self._nodes_to_check.append(nodelocation)
+          logger.info("Could not contact geoip server for: " + nodelocation)
+##          # Try it again later?
+##          self._nodes_to_check.appendleft(nodelocation)
           continue
         raise
 
-      if type(geoinfo) != type(dict()):
+      if not isinstance(geoinfo, dict):
         # Bad datatype
-        # Maybe still allow access to vessel, but prevent from being used in
-        # geographic-related searches?
-        self._bad_node_locations.append(nodelocation)
-        continue
+##        # Maybe still allow access to vessel, but prevent from being used in
+##        # geographic-related searches?
+##        self._bad_node_locations.append(nodelocation)
+##        continue
+        geoinfo = {}
       _format_geoinfo(geoinfo)
 
       # Used to communicate with the node
@@ -429,7 +433,6 @@ class database:
         logger.error("Error contacting " + nodelocation + traceback.format_exc())
 
       nmclient_destroyhandle(node_nmhandle)
-
 
   def _probe_resources_periodic(self):
     ''' Calls the probing function periodically. '''
@@ -904,8 +907,10 @@ def _format_geoinfo(geoinfo):
   # Sometimes, 'city' cannot be found
   if 'city' not in geoinfo:
     geoinfo['city'] = None
+  if 'country_code' not in geoinfo:
+    geoinfo['country_code'] = None
   for location_type in geoinfo:
-    if type(geoinfo[location_type]) == type(''):
+    if isinstance(geoinfo[location_type], basestring):
       geoinfo[location_type] = geoinfo[location_type].lower()
 
 
