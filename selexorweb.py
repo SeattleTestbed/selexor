@@ -35,6 +35,7 @@ import serialize_repy   # Used for serializing objects to comm. with clients
 import rsa_repy   # Used to read the nodestate transition key
 import logging
 import traceback
+from time import sleep
 
 # Set up the logger
 log_filehandler = logging.FileHandler('web_server.log', 'a')
@@ -44,6 +45,15 @@ log_filehandler.setFormatter(logging.Formatter("%(asctime)s %(message)s"))
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 logger.addHandler(log_filehandler)
+
+
+# This is a fix for slow response times for python's base http server.
+# See: http://bugs.python.org/issue6085
+def _bare_address_string(self):
+    host, port = self.client_address[:2]
+    return str(host)
+BaseHTTPServer.BaseHTTPRequestHandler.address_string = _bare_address_string
+# End slow respond time fix for python's base http server.
 
 
 context = {}
@@ -72,7 +82,7 @@ def main():
   http_thread = threading.Thread(target=http_server.serve_forever)
 
   nodestate_transition_key = rsa_repy.rsa_file_to_publickey(context['configuration']['nodestate_transition_key_fn'])
-
+  
   context['selexor_server'] = selexorserver.SelexorServer(
       instance_name,
       advertise_port = context['configuration']['advertise_port'],
@@ -83,23 +93,22 @@ def main():
       allow_ssl_insecure = context['configuration']['allow_ssl_insecure'],
       update_threadcount = context['configuration']['num_probe_threads'],
       probe_delay = context['configuration']['probe_delay'])
+  
 
   http_thread.start()
   print "Listening for connections on", context['configuration']['http_ip'] + ':' + str(context['configuration']['http_port'])
 
-  # Run until:
-  #   CTRL+C is pressed, OR
-  #   HTTP server shuts down
-  while http_thread.isAlive():
-    try:
-      http_thread.join(1.0)
-    except KeyboardInterrupt, e:
-      break
+  # Run indefinitely until CTRL+C is pressed.
+  try:
+    while True:
+      sleep(1.0)
+  except KeyboardInterrupt, e:
+    pass
 
   print "Stopping web server..."
   http_server.shutdown()
   print "Stopping SeleXor server..."
-  context['selexor_server'].shutdown()
+  # context['selexor_server'].shutdown()
   print "Shutdown Complete."
 
 
@@ -215,7 +224,6 @@ def _generate_request_form(config):
   srcfile.close()
   destfile.close()
   context['INDEX_FILE'] = outputfn
-
 
 
 class SelexorHandler(BaseHTTPServer.BaseHTTPRequestHandler):

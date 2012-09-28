@@ -422,7 +422,7 @@ class database:
         if not node_nmhandle:
           nmclient_destroyhandle(node_nmhandle)
         self._bad_node_locations.append(nodelocation)
-        logger.error("Unknown error contacting " + nodelocation + traceback.format_exc())
+        logger.error("Error contacting " + nodelocation + traceback.format_exc())
 
       nmclient_destroyhandle(node_nmhandle)
 
