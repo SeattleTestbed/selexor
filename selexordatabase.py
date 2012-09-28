@@ -360,6 +360,10 @@ class database:
     while self._nodes_to_check:
       if not self._probing:
         break
+      
+      if len(self._nodes_to_check) % 50 == 0:
+        print len(self._nodes_to_check), "nodes remaining!"
+      
       nodelocation = self._nodes_to_check.pop()
       nodeinfo = get_node_ip_port_from_nodelocation(nodelocation)
 
