@@ -271,8 +271,7 @@ class database:
     # Gets all the node_ids that are being actively advertised
     nodelocations = advertise_lookup(self._nodestate_transition_key, maxvals = num_resources_to_get)
 
-    self._nodes_to_check = deque(nodelocations[:num_resources_to_get])
-      
+    self._nodes_to_check = nodelocations[:num_resources_to_get]
     self._checked_vessels = []
     self._bad_node_locations = []
     self._nat_nodes = []
@@ -361,10 +360,6 @@ class database:
     while self._nodes_to_check:
       if not self._probing:
         break
-      
-      if len(self._nodes_to_check) % 50 == 0:
-        logger.info(str(len(self._nodes_to_check)) + "nodes remaining!")
-      
       nodelocation = self._nodes_to_check.pop()
       nodeinfo = get_node_ip_port_from_nodelocation(nodelocation)
 
@@ -373,26 +368,26 @@ class database:
         if nodeinfo['id'].startswith('NAT'):
           self._nat_nodes.append(nodeinfo['id'])
         continue
-
-      # Handle all node-level information here
+      
       geoinfo = {}
+      # Handle all node-level information here
       try:
         geoinfo = geoip_record_by_addr(nodeinfo['id'])
       except Exception, e:
         if "Unable to contact the geoip server" in str(e):
-          logger.info("Could not contact geoip server for: " + nodelocation)
-##          # Try it again later?
-##          self._nodes_to_check.appendleft(nodelocation)
-          continue
-        raise
+          pass
+          # Try it again later
+##          self._nodes_to_check.append(nodelocation)
+##          continue
+        else:
+          raise
 
-      if not isinstance(geoinfo, dict):
+      if type(geoinfo) != type(dict()):
         # Bad datatype
-##        # Maybe still allow access to vessel, but prevent from being used in
-##        # geographic-related searches?
-##        self._bad_node_locations.append(nodelocation)
-##        continue
-        geoinfo = {}
+        # Maybe still allow access to vessel, but prevent from being used in
+        # geographic-related searches?
+        self._bad_node_locations.append(nodelocation)
+        continue
       _format_geoinfo(geoinfo)
 
       # Used to communicate with the node
@@ -430,9 +425,16 @@ class database:
         if not node_nmhandle:
           nmclient_destroyhandle(node_nmhandle)
         self._bad_node_locations.append(nodelocation)
-        logger.error("Error contacting " + nodelocation + traceback.format_exc())
+        errstr = str(e)
+        if  "timed out" in errstr or \
+            'No connection could be made because the target machine actively refused it' in errstr:
+          continue
+        logger.error("Unknown error contacting " + nodelocation + traceback.format_exc())
+      except Exception, e:
+        logger.error("Unknown Error contacting " + nodelocation + traceback.format_exc())
 
       nmclient_destroyhandle(node_nmhandle)
+
 
   def _probe_resources_periodic(self):
     ''' Calls the probing function periodically. '''
@@ -905,12 +907,13 @@ def _format_geoinfo(geoinfo):
 
   '''
   # Sometimes, 'city' cannot be found
-  if 'city' not in geoinfo:
-    geoinfo['city'] = None
-  if 'country_code' not in geoinfo:
-    geoinfo['country_code'] = None
+  possibly_missing_keys = ['city', 'country_code']
+  for missing_key in possibly_missing_keys:
+    if missing_key not in geoinfo:
+      geoinfo[missing_key] = None
+  
   for location_type in geoinfo:
-    if isinstance(geoinfo[location_type], basestring):
+    if type(geoinfo[location_type]) == type(''):
       geoinfo[location_type] = geoinfo[location_type].lower()
 
 
