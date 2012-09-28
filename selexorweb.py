@@ -83,7 +83,7 @@ def main():
 
   nodestate_transition_key = rsa_repy.rsa_file_to_publickey(context['configuration']['nodestate_transition_key_fn'])
   
-  context['selexor_server'] = selexorserver.SelexorServer(
+  context['selexor_server'] = selexor_server = selexorserver.SelexorServer(
       instance_name,
       advertise_port = context['configuration']['advertise_port'],
       nodestate_transition_key = nodestate_transition_key,
@@ -108,7 +108,7 @@ def main():
   print "Stopping web server..."
   http_server.shutdown()
   print "Stopping SeleXor server..."
-  # context['selexor_server'].shutdown()
+  selexor_server.shutdown()
   print "Shutdown Complete."
 
 
