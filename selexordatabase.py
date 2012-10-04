@@ -56,7 +56,6 @@ class database:
   def __init__(self,
       database_name,
       nodestate_transition_key,
-      advertise_port = None,
       geoip_server_uri = None,
       begin_probing = True,
       update_threadcount = 4,
@@ -71,9 +70,6 @@ class database:
         You can have separate instances of the database running with different names.
       nodestate_transition_key:
         The public key to use to look up currently advertising nodes.
-      advertise_port:
-        The port that the Clearinghouse nodes are advertising on. Defaults to
-        Seattle Clearinghouse's value of 1224.
       geoip_server_uri:
         The URI to the GeoIP server to use. Defaults to the Seattle
         Clearinghouse GeoIP server.
@@ -109,9 +105,6 @@ class database:
     # to determine if an update process is currently running.
     self._update_threads = []
 
-    if advertise_port is None:
-      advertise_port = 1224   # Seattle Clearinghouse port
-    self._advertise_port = advertise_port
     # Used to find advertising nodes
     self._nodestate_transition_key = nodestate_transition_key
 
@@ -410,6 +403,7 @@ class database:
           self._update_resource_entry(
               vessel_handle,
               handleinfo['IP'],
+              nodeinfo['port'],
               geoinfo,
               ports = get_ports_from_resource_string(resources_string))
 
@@ -600,7 +594,7 @@ class database:
         }
 
 
-  def _update_resource_entry(self, resource_handle, ip, geoinfo, ports):
+  def _update_resource_entry(self, resource_handle, ip, nodeport, geoinfo, ports):
     '''
     <Arguments>
       resource_handle:
@@ -622,6 +616,7 @@ class database:
     self.handle_table[resource_handle]['ip'] = ip
     self.handle_table[resource_handle]['geographic'] = geoinfo
     self.handle_table[resource_handle]['ports'] = ports
+    self.handle_table[resource_handle]['node_port'] = nodeport
 
     # Update ip_change_count
     if ip != old_resource_info['ip']:

@@ -67,46 +67,35 @@ def main():
     return
 
   instance_name = sys.argv[1]
-  # context['WEB_PATH'] = os.path.abspath(context['WEB_PATH']) + '\\'
 
   # Load the default configuration file, then overwrite the configuration with
   # the data stored in the server-specific configuration file.
-  context['configuration'] = {}
-  context['configuration'] = _load_config_with_file('default', context['configuration'])
-  context['configuration'] = _load_config_with_file(instance_name, context['configuration'])
+  configuration = {}
+  configuration = _load_config_with_file('default', configuration)
+  configuration = _load_config_with_file(instance_name, configuration)
+  context['configuration'] = configuration
 
   # Generate the index file for this configuration
-  _generate_request_form(context['configuration'])
+  _generate_request_form(configuration)
   
-  http_server = BaseHTTPServer.HTTPServer((context['configuration']['http_ip'], context['configuration']['http_port']), SelexorHandler)
+  http_server = BaseHTTPServer.HTTPServer((configuration['http_ip'], configuration['http_port']), SelexorHandler)
   http_thread = threading.Thread(target=http_server.serve_forever)
 
-  nodestate_transition_key = rsa_repy.rsa_file_to_publickey(context['configuration']['nodestate_transition_key_fn'])
+  nodestate_transition_key = rsa_repy.rsa_file_to_publickey(configuration['nodestate_transition_key_fn'])
   
-##  context['selexor_server'] = selexor_server = selexorserver.SelexorServer(
-##      instance_name,
-##      advertise_port = context['configuration']['advertise_port'],
-##      nodestate_transition_key = nodestate_transition_key,
-##      clearinghouse_xmlrpc_uri = context['configuration']['xmlrpc_url'],
-##      geoip_server_uri = context['configuration']['geoip_url'],
-##      begin_probing = True,
-##      allow_ssl_insecure = context['configuration']['allow_ssl_insecure'],
-##      update_threadcount = context['configuration']['num_probe_threads'],
-##      probe_delay = context['configuration']['probe_delay'])
   context['selexor_server'] = selexor_server = selexorserver.SelexorServer(
       instance_name,
-      advertise_port = context['configuration']['advertise_port'],
       nodestate_transition_key = nodestate_transition_key,
-      clearinghouse_xmlrpc_uri = context['configuration']['xmlrpc_url'],
-##      geoip_server_uri = context['configuration']['geoip_url'],
+      clearinghouse_xmlrpc_uri = configuration['xmlrpc_url'],
+      geoip_server_uri = configuration['geoip_url'],
       begin_probing = True,
-      allow_ssl_insecure = context['configuration']['allow_ssl_insecure'],
-      update_threadcount = context['configuration']['num_probe_threads'],
-      probe_delay = context['configuration']['probe_delay'])
+      allow_ssl_insecure = configuration['allow_ssl_insecure'],
+      update_threadcount = configuration['num_probe_threads'],
+      probe_delay = configuration['probe_delay'])
   
 
   http_thread.start()
-  print "Listening for connections on", context['configuration']['http_ip'] + ':' + str(context['configuration']['http_port'])
+  print "Listening for connections on", configuration['http_ip'] + ':' + str(configuration['http_port'])
 
   # Run indefinitely until CTRL+C is pressed.
   try:
@@ -159,7 +148,7 @@ def _load_config_with_file(configname, configuration):
     'allow_ssl_insecure': bool,
   }
 
-  context['configuration']['server_name'] = configname
+  configuration['server_name'] = configname
   configfile = open(configname + '.conf', 'r')
 
   # File parse loop.

@@ -192,7 +192,6 @@ def connect_to_clearinghouse(authdata, allow_ssl_insecure, xmlrpc_url = None):
 class SelexorServer:
   def __init__(self,
                database_name,
-               advertise_port,
                nodestate_transition_key,
                clearinghouse_xmlrpc_uri = None,
                geoip_server_uri = None,
@@ -206,8 +205,6 @@ class SelexorServer:
     <Arguments>
       database_name:
         The name of the database.
-      advertise_port:
-        The port to listen on for vessel information.
       nodestate_transition_key:
         The public key of the Clearinghouse.
       clearinghouse_xmlrpc_uri:
@@ -229,11 +226,9 @@ class SelexorServer:
 
     '''
     self.name = database_name
-    self.advertise_port = advertise_port
     self.clearinghouse_xmlrpc_uri = clearinghouse_xmlrpc_uri
     self.database = selexordatabase.database(
                   database_name,
-                  advertise_port = advertise_port,
                   nodestate_transition_key = nodestate_transition_key,
                   geoip_server_uri = geoip_server_uri,
                   begin_probing = begin_probing,
@@ -385,7 +380,7 @@ class SelexorServer:
             'node_ip': handle_entry['ip'],
             'vesselname': handle_entry['vesselname'],
             'handle': handle,
-            'node_port': self.advertise_port
+            'node_port': handle_entry['node_port']
           }
           group_data['vessels_acquired'].append(nodeinfo)
           
