@@ -46,6 +46,13 @@ div.capsule {
 }
 
 /********************************************
+Fixes the (!) tooltip jumping to the next line on Chrome.
+*********************************************/
+table#auth_table {
+  min-width: 650px;
+}
+
+/********************************************
 Capsule containing the send host request button.
 *********************************************/
 input.authentication_input {
