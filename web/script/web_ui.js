@@ -460,7 +460,9 @@ function update_group_status_spans(groups) {
     // Show vessel release cell
     switch(g_server_status) {
     case 'complete':
-      $('.vessel_release').css('display', 'table-cell')
+      // Don't display remove button if there are no vessels
+      if (groups[groupid]['vessels_acquired'].length)
+        $('.vessel_release').css('display', 'table-cell')
       break
     }
   }
