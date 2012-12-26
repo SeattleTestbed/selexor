@@ -142,10 +142,11 @@ class database:
     self._loadfromfile()
 
     # Connect to specified GeoIP server.
-    if geoip_server_uri:
-      geoip_init_client(geoip_server_uri)
-    else:
+    if (not geoip_server_uri or
+        geoip_server_uri.lower() == 'default'):
       geoip_init_client()
+    else:
+      geoip_init_client(geoip_server_uri)
 
     # Initialization complete
     if begin_probing:
