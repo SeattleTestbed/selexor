@@ -167,7 +167,18 @@ def _load_config_with_file(configname, configuration):
       value = value.strip()
       # Cast to correct type if needed
       if key in cast_type:
-        value = cast_type[key](value)
+        # Default bool casting would require users to type '' -> False, and 
+        # anything else -> True.
+        if cast_type[key] == bool:
+          if value.lower() == 'true':
+            value = True
+          elif value.lower() == 'false':
+            value = False
+          else:
+            raise ValueError("Invalid value '" + value + "' for key '" + key + 
+              "' in config " + configname + ", expected " + str(cast_type[key]))
+        else:
+          value = cast_type[key](value)
       # Insert into configuration
       configuration[key] = value
     data = configfile.readline()
