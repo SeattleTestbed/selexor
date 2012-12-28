@@ -35,6 +35,8 @@ import serialize_repy   # Used for serializing objects to comm. with clients
 import rsa_repy   # Used to read the nodestate transition key
 import logging
 import traceback
+# Raised when we cannot connect to the clearinghouse XMLRPC server
+from xmlrpclib import ProtocolError
 from time import sleep
 
 # Set up the logger
@@ -365,6 +367,14 @@ class SelexorHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     except seattleclearinghouse_xmlrpc.AuthenticationError, e:
       response_dict['status'] = 'error'
       response_dict['error'] = str(e)
+      response_dict['max_hosts'] = "?"
+    except ProtocolError, e:
+      response_dict['status'] = 'error'
+      response_dict['error'] = "SeleXor could not connect to the clearinghouse's XMLRPC server at this moment.  Please try again later."
+      response_dict['max_hosts'] = "?"
+    except Exception, e:
+      response_dict['status'] = 'error'
+      response_dict['error'] = "An internal server error occurred."
       response_dict['max_hosts'] = "?"
     return response_dict
 

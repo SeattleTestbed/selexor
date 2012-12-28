@@ -646,6 +646,12 @@ function authenticate() {
       }
   }).done(function(rawdata, textStatus, jqXhr) {
     var response = repy_deserialize(rawdata.trim())
+    if ('error' in response) {
+      $('#authentication_errtext').addTooltip(response['error'], 'error')
+                                  .css('display', 'inline')
+      $('#username_text, #apikey_text').removeAttr('disabled')
+      return;
+    }
     var data = response['data']
     if ('error' in data) {
       $('#authentication_errtext').addTooltip(data['error'], 'error')
