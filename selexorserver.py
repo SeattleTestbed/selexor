@@ -75,6 +75,7 @@ import seattleclearinghouse_xmlrpc as xmlrpc_client
 import time
 import copy
 import selexorruleparser as parser
+import selexorhelper
 import random
 import rsa_repy
 import cPickle
@@ -143,49 +144,6 @@ def _get_next_group_to_resolve(requestdict):
       next_group = groupname
       min_rulecount = len(group['rules'])
   return next_group
-
-
-
-def connect_to_clearinghouse(authdata, allow_ssl_insecure, xmlrpc_url = None):
-  '''
-  <Purpose>
-    Wrapper for a SeattleClearinghouseClient constructor.
-  <Arguments>
-    authdata:
-      An authdict. See module documentation for more information.
-  <Exceptions>
-    SelexorAuthenticationFailed
-  <Side Effects>
-    Opens an outgoing connection to the specified clearinghouse.
-  <Returns>
-    A client object that can be used to communicate with the Clearinghouse as the
-    specified user.
-
-  '''
-  username = authdata.keys()[0]
-  apikey = None
-  private_key_string = None
-
-  if 'apikey' in authdata[username]:
-    apikey = authdata[username]['apikey']
-  if 'privatekey' in authdata[username]:
-      private_key_string = rsa_repy.rsa_privatekey_to_string(authdata[username]['privatekey'])
-
-  if not (apikey or private_key_string):
-    raise selexorexceptions.SelexorAuthenticationFailed("Either apikey or privatekey must be given!")
-
-  try:
-    client = xmlrpc_client.SeattleClearinghouseClient(
-        username = username,
-        api_key = apikey,
-        xmlrpc_url = xmlrpc_url,
-        private_key_string = private_key_string,
-        allow_ssl_insecure = allow_ssl_insecure)
-  except Exception:
-    print traceback.format_exc()
-    raise
-
-  return client
 
 
 
@@ -300,7 +258,7 @@ class SelexorServer:
       if not vessels_to_release:
         return 0
 
-      client = connect_to_clearinghouse(authdata, self.allow_ssl_insecure, self.clearinghouse_xmlrpc_uri)
+      client = selexorhelper.connect_to_clearinghouse(authdata, self.allow_ssl_insecure, self.clearinghouse_xmlrpc_uri)
       resource_info = client.get_resource_info()
       found_vesselhandles = []
       for resource_dict in resource_info:
@@ -581,7 +539,7 @@ class SelexorServer:
 
     if request_data['status'] == 'accepted':
       try:
-        client = connect_to_clearinghouse(authinfo, self.allow_ssl_insecure, self.clearinghouse_xmlrpc_uri)
+        client = selexorhelper.connect_to_clearinghouse(authinfo, self.allow_ssl_insecure, self.clearinghouse_xmlrpc_uri)
       except selexorexceptions.SelexorException, e:
         request_data['status'] = 'error'
         request_data['error'] = str(e)

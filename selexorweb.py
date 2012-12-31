@@ -35,6 +35,7 @@ import serialize_repy   # Used for serializing objects to comm. with clients
 import rsa_repy   # Used to read the nodestate transition key
 import logging
 import traceback
+import selexorhelper
 # Raised when we cannot connect to the clearinghouse XMLRPC server
 from xmlrpclib import ProtocolError
 from time import sleep
@@ -367,7 +368,7 @@ class SelexorHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     '''
     response_dict = {}
     try:
-      client = selexorserver.connect_to_clearinghouse(data, context['configuration']['allow_ssl_insecure'], context['configuration']['xmlrpc_url'])
+      client = selexorhelper.connect_to_clearinghouse(data, context['configuration']['allow_ssl_insecure'], context['configuration']['xmlrpc_url'])
       accinfo = client.get_account_info()
       acquired_resources = client.get_resource_info()
 
