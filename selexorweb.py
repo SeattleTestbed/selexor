@@ -35,10 +35,10 @@ import serialize_repy   # Used for serializing objects to comm. with clients
 import rsa_repy   # Used to read the nodestate transition key
 import logging
 import traceback
+import selexorhelper
 # Raised when we cannot connect to the clearinghouse XMLRPC server
 from xmlrpclib import ProtocolError
 from time import sleep
-import selexorhelper
 
 # Set up the logger
 log_filehandler = logging.FileHandler('web_server.log', 'a')
@@ -94,8 +94,7 @@ def main():
       begin_probing = True,
       allow_ssl_insecure = configuration['allow_ssl_insecure'],
       update_threadcount = configuration['num_probe_threads'],
-      probe_delay = configuration['probe_delay'],
-      debug = configuration['debug'])
+      probe_delay = configuration['probe_delay'])
   
 
   http_thread.start()
@@ -150,7 +149,6 @@ def _load_config_with_file(configname, configuration):
     'num_probe_threads': int,
     'probe_delay': int,
     'allow_ssl_insecure': bool,
-    'debug': bool
   }
 
   configuration['server_name'] = configname
@@ -370,11 +368,7 @@ class SelexorHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     '''
     response_dict = {}
     try:
-      client = selexorhelper.connect_to_clearinghouse(data, 
-          context['configuration']['allow_ssl_insecure'], 
-          context['configuration']['xmlrpc_url'],
-          debug=context['configuration']['debug'])
-          
+      client = selexorhelper.connect_to_clearinghouse(data, context['configuration']['allow_ssl_insecure'], context['configuration']['xmlrpc_url'])
       accinfo = client.get_account_info()
       acquired_resources = client.get_resource_info()
 
@@ -390,7 +384,10 @@ class SelexorHandler(BaseHTTPServer.BaseHTTPRequestHandler):
       response_dict['status'] = 'error'
       response_dict['error'] = "SeleXor could not connect to the clearinghouse's XMLRPC server at this moment.  Please try again later."
       response_dict['max_hosts'] = "?"
-      
+    except Exception, e:
+      response_dict['status'] = 'error'
+      response_dict['error'] = "An internal server error occurred."
+      response_dict['max_hosts'] = "?"
     return response_dict
 
 
