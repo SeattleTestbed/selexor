@@ -19,6 +19,42 @@ import os
 
 helpercontext = {}
 
+def initialize():
+  helpercontext['COUNTRY_TO_ID'] = load_ids('country')
+  # This takes up too much memory...
+  # helpercontext['CITY_TO_ID'] = load_ids('city')
+
+
+
+def get_city_id(cityname):
+  # City table takes up several hundred MB of space... We treat all city names
+  # as valid for now
+  return cityname
+
+
+def get_country_id(countryname):
+  countryname = countryname.lower()
+  try:
+    return helpercontext['COUNTRY_TO_ID'][countryname]
+  except KeyError, e:
+    raise selexorexceptions.UnknownLocation(countryname)
+
+
+def load_ids(idtype):
+  id_file = open('./lookup/' + idtype + '.txt', 'r')
+  id_map = {}
+
+  line = id_file.readline().lower()
+  while line:
+    ids = line.split('\t')
+    good_id = ids[0].strip()
+    for id in ids:
+      id_map[id.strip()] = good_id
+
+    line = id_file.readline().lower()
+  id_file.close()
+  return id_map
+
 
 def connect_to_clearinghouse(authdata, allow_ssl_insecure = False, xmlrpc_url = None, debug=False):
   '''
