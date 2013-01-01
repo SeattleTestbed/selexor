@@ -16,6 +16,7 @@
 import math
 import selexorexceptions
 import os
+import seattleclearinghouse_xmlrpc
 
 helpercontext = {}
 
@@ -84,16 +85,12 @@ def connect_to_clearinghouse(authdata, allow_ssl_insecure = False, xmlrpc_url = 
   if not (apikey or private_key_string):
     raise selexorexceptions.SelexorAuthenticationFailed("Either apikey or privatekey must be given!")
 
-  try:
-    client = xmlrpc_client.SeattleClearinghouseClient(
-        username = username,
-        api_key = apikey,
-        xmlrpc_url = xmlrpc_url,
-        private_key_string = private_key_string,
-        allow_ssl_insecure = allow_ssl_insecure)
-  except Exception:
-    print traceback.format_exc()
-    raise
+  client = seattleclearinghouse_xmlrpc.SeattleClearinghouseClient(
+      username = username,
+      api_key = apikey,
+      xmlrpc_url = xmlrpc_url,
+      private_key_string = private_key_string,
+      allow_ssl_insecure = allow_ssl_insecure)
 
   return client
 
