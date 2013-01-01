@@ -617,10 +617,14 @@ class SelexorServer:
         group['status'] = 'error'
         group['error'] = str(e)
         logger.info(str(identity) + ": Not enough credits.")
+        request_data['status'] = 'error'
+        return
       except:
         group['status'] = 'error'
         group['error'] = "An internal error occured while resolving this group."
-        logger.error(str(identity) + ": Unknown error while resolving nodes\n" + traceback.format_exc()) 
+        logger.error(str(identity) + ": Unknown error while resolving nodes\n" + traceback.format_exc())
+        request_data['status'] = 'error'
+        return
       if group['status'] in FINISHED_PROCESSING_STATUSES:
         logger.info(str(identity) + ": Group finished processing with status: " + str(group['status']))
         incomplete_groups.pop(group['id'])

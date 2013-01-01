@@ -16,6 +16,8 @@
 import math
 import selexorexceptions
 import os
+import seattleclearinghouse_xmlrpc
+import selexor_fake_xmlrpc_client
 
 helpercontext = {}
 
@@ -62,11 +64,20 @@ def connect_to_clearinghouse(authdata, allow_ssl_insecure = False, xmlrpc_url = 
     Wrapper for a SeattleClearinghouseClient constructor.
   <Arguments>
     authdata:
-      An authdict. See module documentation for more information.
+      An authdict. See selexorserver's documentation for more information.
+    allow_ssl_insecure:
+      bool. If disabled (therefore enabling SSL), there should be a cacerts.pem 
+      file in the XMLRPC client's folder. 
+    xmlrpc_url: 
+      string. The URL of the clearinghouse's XMLRPC client.
+    debug:
+      If debug mode is enabled, a dummy client is returned instead. This is used
+      for development if the XMLRPC server is unreachable.
   <Exceptions>
     SelexorAuthenticationFailed
   <Side Effects>
-    Opens an outgoing connection to the specified clearinghouse.
+    Opens an outgoing connection to the specified clearinghouse if the debug 
+    flag is turned off.
   <Returns>
     A client object that can be used to communicate with the Clearinghouse as the
     specified user.
@@ -75,6 +86,9 @@ def connect_to_clearinghouse(authdata, allow_ssl_insecure = False, xmlrpc_url = 
   username = authdata.keys()[0]
   apikey = None
   private_key_string = None
+  
+  if debug:
+    return selexor_fake_xmlrpc_client.DummySeattleClearinghouseClient()
 
   if 'apikey' in authdata[username]:
     apikey = authdata[username]['apikey']
@@ -84,16 +98,12 @@ def connect_to_clearinghouse(authdata, allow_ssl_insecure = False, xmlrpc_url = 
   if not (apikey or private_key_string):
     raise selexorexceptions.SelexorAuthenticationFailed("Either apikey or privatekey must be given!")
 
-  try:
-    client = xmlrpc_client.SeattleClearinghouseClient(
-        username = username,
-        api_key = apikey,
-        xmlrpc_url = xmlrpc_url,
-        private_key_string = private_key_string,
-        allow_ssl_insecure = allow_ssl_insecure)
-  except Exception:
-    print traceback.format_exc()
-    raise
+  client = seattleclearinghouse_xmlrpc.SeattleClearinghouseClient(
+      username = username,
+      api_key = apikey,
+      xmlrpc_url = xmlrpc_url,
+      private_key_string = private_key_string,
+      allow_ssl_insecure = allow_ssl_insecure)
 
   return client
 

@@ -59,7 +59,8 @@ class database:
       geoip_server_uri = None,
       begin_probing = True,
       update_threadcount = 4,
-      probe_delay = 300):
+      probe_delay = 300,
+      debug = False):
     '''
     <Purpose>
       Sets up this instance of the database.
@@ -149,7 +150,8 @@ class database:
       geoip_init_client(geoip_server_uri)
 
     # Initialization complete
-    if begin_probing:
+    # Don't probe if we're running in debug mode
+    if not debug and begin_probing:
       self.begin_probing()
 
 
