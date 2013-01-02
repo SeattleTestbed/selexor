@@ -1,0 +1,61 @@
+﻿<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<title>SeleXor</title>
+<link rel="stylesheet" href="./css/web_ui.css" />
+<link rel="stylesheet" href="./css/jquery.tooltip.css" />
+<script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.7.2/jquery.min.js"></script>
+<script type="text/javascript" src="./script/jquery.dimensions.js"></script>
+<script type="text/javascript" src="./script/jquery.tooltip.min.js"></script>
+<script type="text/javascript" src="script/jquery.numeric.js"></script>
+<script type="text/javascript" src="./script/serialize.js"></script>
+<script type="text/javascript" src="./script/web_ui.js"></script>
+</head>
+
+<body>
+	<div id="selexor_main" class="capsule">
+		<h1 id="selexor_title">SeleXor - <a href="https://seattlegeni.cs.washington.edu/geni">Seattle Clearinghouse</a></h1>
+		<h2 id="selexor_subtitle">Seattle Advanced Vessel Selection Tool</h2>
+		<table>
+		<tr>
+			<td id="username_label">Username<span id='username_tooltip'></span></td>
+			<td><input type="text" class="authentication_input" id="username_text" /></td>
+		</tr>
+		<tr>
+      <!-- We don't want the user to be able to tab into this anchor -->
+			<td id="apikey_label">API Key<a href="https://seattlegeni.cs.washington.edu/geni/html/api_info" tabindex='-1'><span id='apikey_tooltip'></span></a>
+      </td>
+			<td><input type="text" class="authentication_input" id="apikey_text" /></td>
+		</tr>
+		<tr>
+			<td id="port_input_label">Port Requested<span id="port_tooltip"></span></td>
+			<td><input type="text" class='request_input' id="port_input_text" /></td>
+		</tr>
+		</table>
+		<span id="authentication_span">
+    <input type="button" id="authentication_button" value="Authenticate" /></span>
+    <img id='authentication_progress' src='./images/progress.gif' alt='Authentication in progress...' hidden='true' />
+    <span id='authentication_errtext'></span>
+  <!-- Group Definitions -->
+	<div class="capsule">
+		<h2 id="group_label">Groups</h2>	
+		<table id="group_table">
+			<tr id='hosts_remaining_row'>
+        <td>
+          <span id="hosts_remaining_span">
+            <span class="request_input" id="num_hosts_remaining">?</span> vessels remaining!
+          </span>
+        </td>
+			</tr>
+		</table>
+		<input id='new_group_button' type="button" value="New Group"/>
+	</div>
+  <!-- Group Definitions -->
+		<div class="capsule" id="acquire_capsule">
+      <input id="vessel_acquire_button" type="button" value="Send Request" />
+      <span id="vessel_acquire_errtext"></span>
+		</div>
+	</div>
+</body>
+</html>
