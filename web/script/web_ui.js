@@ -1201,17 +1201,23 @@ function release_group(groupid) {
     var data = response['data']
     row.find('.vessel_selection').val(0);
     // No errors occur
-    if (data[0]) {
-      g_num_hosts_remaining += data[1]
-
-      update_remaining_host_count()
-      row.find('.vessel_release, .status_cell').hide();
-      // We don't need to keep track of these vessels anymore
-      delete g_vessels_acquired[groupid]
-    } 
-    // There was an error
+    var error = ''
+    if (response['status'] == 'error')
+      error = response['error']
     else {
-      row.find('.status_cell').text(data[1]).css('display', 'table-cell')
+      if (data[0]) {
+        g_num_hosts_remaining += data[1]
+  
+        update_remaining_host_count()
+        row.find('.vessel_release, .status_cell').hide();
+        // We don't need to keep track of these vessels anymore
+        delete g_vessels_acquired[groupid]
+      } else
+        error = data[1]
+      } 
+    // There was an error
+    if (error != ''){
+      row.find('.status_cell').text(error).css('display', 'table-cell')
     }
   }).fail(function(data, textStatus, jqXhr) {
     alert("Failed to connect to server!")
