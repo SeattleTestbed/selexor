@@ -358,7 +358,7 @@ function update_vessels_dict(groups) {
   for (var groupname in groups) {
     g_vessels_acquired[groupname] = []
     for (var vessel_num in groups[groupname]['vessels_acquired'])
-      g_vessels_acquired[groupname].push(get_nodehandle_from_vesseldict(groups[groupname]['vessels_acquired'][vessel_num]))
+      g_vessels_acquired[groupname].push(groups[groupname]['vessels_acquired'][vessel_num])
   }
 }
 

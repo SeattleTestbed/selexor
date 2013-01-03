@@ -237,7 +237,9 @@ class SelexorServer:
       authdata:
         An authdict. See module documentation for more information.
       vessels:
-        A list of node handles to release.
+        A list of dictionaries containing vessel information of the vessels 
+        to release.  These dictionaries should either contain the vessel handle,
+        or node_ip:node_port:vesselname. 
       remoteip:
         The remote IP address of the client. This is used for client identification.
     <Exceptions>
@@ -258,34 +260,35 @@ class SelexorServer:
       if not vessels_to_release:
         return 0
 
-      client = selexorhelper.connect_to_clearinghouse(authdata, self.allow_ssl_insecure, self.clearinghouse_xmlrpc_uri)
-      resource_info = client.get_resource_info()
-      found_vesselhandles = []
-      for resource_dict in resource_info:
-        nmvesselhandle = resource_dict['node_ip'] + ":" + str(resource_dict['node_port']) + ':' + resource_dict['vessel_id']
-        if nmvesselhandle in vessels_to_release:
-          found_vesselhandles.append(resource_dict['handle'])
-          vessels_to_release.remove(nmvesselhandle)
+      handles_of_vessels_to_release = []
+      for vesseldict in vessels_to_release:
+        if 'node_handle' in vesseldict:
+          handles_of_vessels_to_release.append(vesseldict['node_handle'])
+        # Try to connect to that node to get the handle
+        else:
+          vessel_location = vesseldict['node_ip']+':'+str(int(vesseldict['node_port']))+':'+vesseldict['vesselname']
+          try:
+            handles_of_vessels_to_release.append(get_handle_from_nodehandle(vessel_location))
+          except fastnmclient.NMClientException, e:
+            logger.info("Failed to look up vessel "+vessel_location+' through nodemanager: '+ str(e))
           
-      if found_vesselhandles:
-        client.release_resources(found_vesselhandles)
-        logger.info(str(identity) + " Found these vessels through xmlrpc client: \n" + str(found_vesselhandles))
+      client = selexorhelper.connect_to_clearinghouse(authdata, 
+          self.allow_ssl_insecure, self.clearinghouse_xmlrpc_uri)
       
-      # Look up the handles if there are any remaining vessels
-      for vessel in vessels_to_release:
+      # Release the remaining vessels
+      for vessel in handles_of_vessels_to_release:
         # Do we need to check if a vessel failed to release?
         # Maybe it means that a vessel has gone offline/is now invalid.
-        logger.info(str(identity) + " Looking up + releasing: " + vessel)
-        client.release_resources([get_handle_from_nodehandle(vessel)])
+        client.release_resources([vessel])
 
       # Assume all the vessels were released successfully
-      self.database.mark_handles_as_unallocated(found_vesselhandles)
-      num_released = len(found_vesselhandles)
+      self.database.mark_handles_as_unallocated(handles_of_vessels_to_release)
+      num_released = len(handles_of_vessels_to_release)
 
       # Remove vessel entries from the groups tables.
       if identity in request_datum:
         for group in request_datum[identity]['groups']:
-          for vesselhandle in found_vesselhandles:
+          for vesselhandle in handles_of_vessels_to_release:
             if vesselhandle in request_datum[identity]['groups'][group]['acquired']:
               request_datum[identity]['groups'][group]['acquired'].remove(vesselhandle)
               request_datum[identity]['groups'][group]['allocate'] -= 1
@@ -294,7 +297,7 @@ class SelexorServer:
       logger.error(str(identity) +': Unknown error while releasing vessels\n' + traceback.format_exc())
       return (False, "Internal error occurred.")
 
-    logger.info(str(identity) +': Successfully released ' + str(len(found_vesselhandles)) + ' vessel(s)')
+    logger.info(str(identity) +': Successfully released ' + str(len(handles_of_vessels_to_release)) + ' vessel(s)')
     return (True, num_released)
 
 
