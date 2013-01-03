@@ -17,6 +17,7 @@ import math
 import selexorexceptions
 import os
 import seattleclearinghouse_xmlrpc
+import selexor_dummy_xmlrpc_client
 
 helpercontext = {}
 
@@ -57,7 +58,7 @@ def load_ids(idtype):
   return id_map
 
 
-def connect_to_clearinghouse(authdata, allow_ssl_insecure = False, xmlrpc_url = None, debug=False):
+def connect_to_clearinghouse(authdata, allow_ssl_insecure = False, xmlrpc_url = None, use_emulated_client=False):
   '''
   <Purpose>
     Wrapper for a SeattleClearinghouseClient constructor.
@@ -76,6 +77,9 @@ def connect_to_clearinghouse(authdata, allow_ssl_insecure = False, xmlrpc_url = 
   username = authdata.keys()[0]
   apikey = None
   private_key_string = None
+
+  if use_emulated_client:
+    return selexor_dummy_xmlrpc_client.DummySeattleClearinghouseClient(username)
 
   if 'apikey' in authdata[username]:
     apikey = authdata[username]['apikey']

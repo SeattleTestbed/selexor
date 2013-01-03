@@ -94,7 +94,8 @@ def main():
       begin_probing = True,
       allow_ssl_insecure = configuration['allow_ssl_insecure'],
       update_threadcount = configuration['num_probe_threads'],
-      probe_delay = configuration['probe_delay'])
+      probe_delay = configuration['probe_delay'],
+      use_emulated_xmlrpc = configuration['use_emulated_xmlrpc'])
   
 
   http_thread.start()
@@ -149,6 +150,7 @@ def _load_config_with_file(configname, configuration):
     'num_probe_threads': int,
     'probe_delay': int,
     'allow_ssl_insecure': bool,
+    'use_emulated_xmlrpc': bool
   }
 
   configuration['server_name'] = configname
@@ -368,7 +370,11 @@ class SelexorHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     '''
     response_dict = {}
     try:
-      client = selexorhelper.connect_to_clearinghouse(data, context['configuration']['allow_ssl_insecure'], context['configuration']['xmlrpc_url'])
+      client = selexorhelper.connect_to_clearinghouse(
+          data, 
+          context['configuration']['allow_ssl_insecure'], 
+          context['configuration']['xmlrpc_url'],
+          context['configuration']['use_emulated_xmlrpc'])
       accinfo = client.get_account_info()
       acquired_resources = client.get_resource_info()
 
