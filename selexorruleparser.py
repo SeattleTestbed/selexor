@@ -30,13 +30,15 @@ ruledict:
   The callback function must accept the following parameters:
     handleset:
       A set of handle handles.
-    database:
-      The database to use. This is a selexordatabase.
+    cursor:
+      A database cursor object.  This is can be acquired by calling db.cursor().
     invert: (bool)
       If set to true, invert the rule.
     parameters: (dictionary)
       A dictionary of parameters that the rule expects.
-  The callback function should also return the set of handles that pass the rule.
+  The callback function should also return the list of (nodelocation, vesselname) 
+  that pass the rule.  It should be in the same format as returned by a MySQL 
+  lookup.
 
   After defining the callback function, simply place it into the corresponding
   rules dictionary in the _init function.
@@ -156,7 +158,7 @@ def has_group_rules(rules):
   return False
 
 
-def apply_vessel_rules(rules, database, vesselset):
+def apply_vessel_rules(rules, cursor, vesselset):
   '''
   <Purpose>
     Parse handles within handleset based on the specified rules. This should be
@@ -165,30 +167,30 @@ def apply_vessel_rules(rules, database, vesselset):
     rules: (dict)
       A dictionary containing ruletypes and their parameters. See the rule callbacks
       for more information regarding the parameters.
-    database: selexordatabase
-      The selexordatabase to use for looking up detailed information about each handle.
-    handleset:
-      The set of handles to consider for these rules.
+    cursor: MySQLdb cursor
+      A cursor to the MySQLdb that contains the latest vessel information.
+    vesselset:
+      The set of vessels to consider for these rules.
   <Exceptions>
     None
   <Side Effects>
     Applies all known rules onto the input set.
   <Return>
-    The set of handles that satisfy the given condition.
+    The set of vessels that satisfy the given condition.
 
   '''
+  vesselset = set(vesselset)
   for rule_name, rule_params in rules.iteritems():
     if rule_name in rule_callbacks['vessel']:
       invert = 'invert' in rule_params
-      vesselset = rule_callbacks['vessel'][rule_name](
-                      vesselset,
-                      database,
+      vesselset.intersection_update(rule_callbacks['vessel'][rule_name](
+                      cursor,
                       invert,
-                      rule_params)
+                      rule_params))
   return vesselset
 
 
-def apply_group_rules(rules, database, vesselset, acquired_vessels):
+def apply_group_rules(rules, cursor, vesselset, acquired_vessels):
   '''
   <Purpose>
     Parse handles within handleset based on the specified rules.
@@ -198,8 +200,8 @@ def apply_group_rules(rules, database, vesselset, acquired_vessels):
   <Arguments>
     rules: (dict)
       A ruledict. See module documentation for more information.
-    database: selexordatabase
-      The selexordatabase to use for looking up detailed information about each handle.
+    cursor: MySQLdb cursor
+      A cursor to the MySQLdb that contains the latest vessel information.
     handleset:
       The set of handles to consider for these rules.
   <Exceptions>
@@ -208,25 +210,26 @@ def apply_group_rules(rules, database, vesselset, acquired_vessels):
     Applies all known rules onto the input set.
   <Return>
     The set of handles that satisfy the given condition.
-
   '''
   # We need at least one vessel before we can start applying group rules.
+  # Need not apply to all rules... i.e. if separation distance is specified,
+  # all acquired vessels MUST have coordinates.
   if not acquired_vessels:
     return vesselset
+  vesselset = set(vesselset)
 
   for rule_name, rule_params in rules.iteritems():
     if rule_name in rule_callbacks['group']:
       invert = 'invert' in rule_params
-      vesselset = rule_callbacks['group'][rule_name](
-                      vesselset,
-                      database,
+      vesselset.intersection_update(rule_callbacks['group'][rule_name](
+                      cursor,
                       invert,
                       rule_params,
-                      acquired_vessels)
+                      acquired_vessels))
   return vesselset
 
 
-def get_worst_vessel(acquired_vessels, handleset, database, rules):
+def get_worst_vessel(acquired_vessels, handleset, cursor, rules):
   '''
   <Purpose>
     Returns the vessel that, when removed, gives the largest accessible
@@ -234,7 +237,7 @@ def get_worst_vessel(acquired_vessels, handleset, database, rules):
   <Arguments>
     acquired_vessels: list of vessel handles currently acquired.
     handleset: The set of all valid handles. (without group-level rules applied)
-    database: The database to interface against.
+    cursor: The cursor that we should use to check the database.
     rules: The rules to use.
   <Exceptions>
     ValueError
@@ -251,7 +254,7 @@ def get_worst_vessel(acquired_vessels, handleset, database, rules):
   for vessel in acquired_vessels:
     acquired_vessels_except_one = deepcopy(acquired_vessels)
     acquired_vessels_except_one.remove(vessel)
-    accessible_vessels = apply_group_rules(rules, database, handleset, acquired_vessels_except_one)
+    accessible_vessels = apply_group_rules(rules, cursor, handleset, acquired_vessels_except_one)
     if len(accessible_vessels) > largest_accessible_vessels_size:
       largest_accessible_vessels = accessible_vessels
       worst_vessel = vessel
@@ -275,7 +278,7 @@ def _specific_location_preprocessor(parameters):
     BadParameter
   <Side Effects>
     After running:
-      'city' should be either a string, or None (for optional).
+      'city' should be present if the user specified a city.
       'country' should be a valid ISO-3166-2 country code.
 
   '''
@@ -284,16 +287,17 @@ def _specific_location_preprocessor(parameters):
     if parameter not in required_parameters:
       raise selexorexceptions.MissingParameter(parameter)
 
+  retdict = {}
   try:
     if parameters['city'] == '?':
-      parameters['city'] = None
+      retdict['city'] = None
     else:
-      parameters['city'] = helper.get_city_id(parameters['city'])
-    parameters['country'] = helper.get_country_id(parameters['country'])
+      retdict['city'] = helper.get_city_id(parameters['city'])
+    retdict['country_code'] = helper.get_country_id(parameters['country'])
   except selexorexceptions.UnknownLocation, e:
     raise selexorexceptions.BadParameter(str(e))
 
-  return parameters
+  return retdict
 
 
 def _different_location_preprocessor(parameters):
@@ -327,33 +331,24 @@ def _different_location_preprocessor(parameters):
     if parameter not in required_parameters:
       raise selexorexceptions.MissingParameter(parameter)
   try:
-    try:
-      parameters['location_count'] = float(parameters['location_count'])
-      if parameters['location_count'] == float('inf'):
-        parameters['location_count'] = 2 ** 32
-      else:
-        parameters['location_count'] = int(parameters['location_count'])
-    except ValueError:
-      selexorexceptions.BadParameter("Location count must be a number!")
-    if parameters['location_count'] <= 0:
-      raise selexorexceptions.BadParameter("Location count must be a positive integer!")
+    parameters['location_count'] = float(parameters['location_count'])
+    if parameters['location_count'] == float('inf'):
+      parameters['location_count'] = 2 ** 32
+    else:
+      parameters['location_count'] = int(parameters['location_count'])
+  except ValueError:
+    selexorexceptions.BadParameter("Location count must be a number!")
+  if parameters['location_count'] <= 0:
+    raise selexorexceptions.BadParameter("Location count must be a positive integer!")
 
-    parameters['location_type'] = parameters['location_type'].lower()
+  parameters['location_type'] = parameters['location_type'].lower()
 
-    # Convert everything to plural, because that's what we're checking in the
-    # actual rule.
-    singular_to_plural = {'city': 'cities', 'country': 'countries'}
-    for type in singular_to_plural:
-      if parameters['location_type'] == type:
-        parameters['location_type'] = singular_to_plural[type]
-    if not parameters['location_type'] in ['cities', 'countries']:
-      raise selexorexceptions.BadParameter("Unknown location type: " + parameters['location_type'])
-  except ValueError, e:
-    raise
+  if not parameters['location_type'] in ['city', 'country_code']:
+    raise selexorexceptions.BadParameter("Unknown location type: " + parameters['location_type'])
   return parameters
 
 
-def _specific_location_parser(handleset, database, invert, parameters):
+def _specific_location_parser(cursor, invert, parameters):
   '''
   <Purpose>
     Vessel-Level Rule. Performs location-based parsing for handles.
@@ -367,13 +362,23 @@ def _specific_location_parser(handleset, database, invert, parameters):
                identifier.
 
   '''
-  good_handles = database.get_accessible_vessels(
-        city = parameters['city'],
-        country = parameters['country'],
-        vesselset = handleset)
+  # Get the nodelocations that are good.
+  # The city field is optional
+  if parameters['city'] is None:
+    location_query = 'country_code="'+parameters['country_code']+'"'
+  else:
+    location_query = 'city="'+parameters['city']+'" AND country_code="'+parameters['country_code']+'"'
   if invert:
-    good_handles = handleset - good_handles
-  return good_handles
+    location_query = 'NOT ' + location_query
+  cursor.execute('SELECT nodelocation from location WHERE ' + location_query)
+  
+  good_vessels = []
+  # Get the vessels on those nodelocations  
+  for nodelocationtuple in cursor.fetchall():
+    cursor.execute('SELECT nodelocation, vesselname FROM vessels WHERE NodeLocation="' + nodelocationtuple[0] +'"')
+    good_vessels += cursor.fetchall()
+  
+  return good_vessels
 
 
 def _separation_radius_preprocessor(parameters):
@@ -446,7 +451,7 @@ def _ip_change_count_preprocessor(parameters):
   return parameters
 
 
-def _separation_radius_parser(handleset, database, invert, parameters, acquired_handles):
+def _separation_radius_parser(cursor, invert, parameters, acquired_vessels):
   '''
   <Purpose>
     Group-Level Rule. Performs distance-based parsing for handles.
@@ -459,25 +464,44 @@ def _separation_radius_parser(handleset, database, invert, parameters, acquired_
         Expected Range: [0, Infinity)
 
   '''
-  good_handles = set()
-  for handle in handleset:
-    # If acquired_handles is empty, we want to allow all handles.
+  
+  acquired_coordinates = set()
+  # Get the coordinates of the acquired vessels
+  for acquired_vessel in acquired_vessels:
+    # We may have NULL/NULL for the coordinate data.  
+    # Make sure we don't fetch any of those entries.
+    if cursor.execute('''
+        SELECT longitude, latitude FROM location LEFT JOIN nodes 
+        USING (nodelocation) WHERE longitude IS NOT NULL AND latitude IS NOT NULL 
+        AND nodekey="'''+acquired_vessel.split(':')[0]+'"') == 1L:
+      acquired_coordinates.add(cursor.fetchone())
+  
+  # Compile the list of good nodelocations
+  good_nodelocations = []
+  cursor.execute('SELECT DISTINCT nodelocation, longitude, latitude FROM location WHERE longitude IS NOT NULL and latitude IS NOT NULL')
+  for nodelocation, longitude, latitude in cursor.fetchall():
     good_radius = True
-    for acquired in acquired_handles:
-      distance = helper.haversine_distance_between_handles(
-            database.handle_table[handle],
-            database.handle_table[acquired])
+    for acquired_longitude, acquired_latitude in acquired_coordinates:
+      distance = helper.haversine_distance(longitude, latitude, acquired_longitude, acquired_latitude)
       good_radius = distance >= parameters['min_radius'] and \
                     distance <= parameters['max_radius']
       # If distance to one is incorrect, then we don't need to check the rest
       if not good_radius:
         break
     if invert ^ good_radius:
-      good_handles.add(handle)
-  return good_handles
+      good_nodelocations.append(nodelocation)
+      
+  # Of the list of good nodelocations, compile the set of good vessels
+  good_vessels = set()
+  for nodelocation in good_nodelocations:
+    cursor.execute('SELECT vesselname FROM vessels WHERE nodelocation="'+nodelocation+'"')
+    for vessel in cursor.fetchall():
+      good_vessels.add((nodelocation, vessel))
+  
+  return good_vessels
 
 
-def _different_location_type_parser(handleset, database, invert, parameters, acquired_vessels):
+def _different_location_type_parser(cursor, invert, parameters, acquired_vessels):
   '''
   <Purpose>
     Group-Level Rule. Performs location type-based parsing for handles.
@@ -493,34 +517,33 @@ def _different_location_type_parser(handleset, database, invert, parameters, acq
         The kind of location that is differentiated. 'cities' or 'countries'.
 
   '''
-  locations = {}
+  locations= set()
   # Compile list of locations
-  for handle in acquired_vessels:
-    location_name = helper.get_handle_location(handle, parameters['location_type'], database)
-    if location_name not in locations:
-      locations[location_name] = []
-    locations[location_name].append(handle)
+  for acquired_vessel in acquired_vessels:
+    cursor.execute('SELECT (nodelocation) FROM nodes WHERE nodekey="'+acquired_vessel.split(':')[0]+'"')
+    nodelocation = cursor.fetchone()[0]
+    cursor.execute('SELECT '+parameters['location_type']+' FROM location WHERE nodelocation="'+nodelocation+'"')
+    locations.add(cursor.fetchone()[0])
 
-  good_vessels = set()
-
-  for handle in handleset:
-    location_name = helper.get_handle_location(handle, parameters['location_type'], database)
-    if len(locations) < parameters['location_count']:
-      # Not enough locations
-      # Allow only new locations
-      location_good = not location_name in locations
-    elif len(locations) == parameters['location_count']:
-      # Number of Locations is correct
-      # Allow any vessel that is in the found locations
-      location_good = location_name in locations
-    else:
-      # This should never happen
-      raise ValueError("More locations than requested!")
-
-    if invert ^ location_good:
-      good_vessels.add(handle)
-
-  return good_vessels
+  query = parameters['location_type'] + " "
+  
+  # If we have enough locations, we want vessels to only be from the 
+  # already acquired locations.
+  # If we don't have enough locations, we want vesels to not be from
+  # the already acquired locations.
+  
+  # Truth table:
+  #                        |  Invert  | Dont invert
+  # Not enough locations   |    IN    |   NOT IN              
+  # Enough Locations       |  NOT IN  |     IN
+  if ((not invert and len(locations) < parameters['location_count']) or 
+      (invert and len(locations) == parameters['location_count'])):
+    query += 'NOT '
+  query += 'IN ("'+'", "'.join(locations)+'")'
+  
+  cursor.execute('SELECT nodelocation, vesselname FROM vessels LEFT JOIN location USING (nodelocation) WHERE '+query)
+    
+  return cursor.fetchall()
 
 
 def _ip_change_count_parser(handleset, database, invert, parameters):

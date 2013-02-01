@@ -29,7 +29,7 @@ var CONTENT_TOOLTIPS = {
   "Get Vessels": 'The number of vessels to obtain.',
   "Include Other Groups": "Groups to apply this condition to.<br /><select><option>N/A</option></select> indicates that there is no target.<br />Press the <input type='button' value='+' /> button to add more targets.<br />Press the <input type='button' value='-' /> button to remove the last target. Does nothing if there is only one target left."
 }
-var IMPLEMENTED_RULES = ["None", "num_ip_change", "location_specific", "location_different", "location_separation_radius"]
+var IMPLEMENTED_RULES = ["None", "location_specific", "location_different", "location_separation_radius"]
 var RULE_DEF = {
   "None": {
     'text':"of any type",
@@ -61,7 +61,7 @@ var RULE_DEF = {
     'text': 'from different locations',
     'parameters':[
       {'type': 'num_text','names': ['location_count'],'placeholders': [Infinity],'default_values': [Infinity],'tooltip': "The number of different locations to search from.<br />If this is set to a value larger than the number of vessels to acquire, then all vessels will be from different locations."},
-      {'type': 'select', 'names': ['location_type'], /*'default_values': null, */ 'param_values': ['cities', 'countries']}
+      {'type': 'select', 'names': ['location_type'], /*'default_values': null, */ 'param_values': ['city', 'country_code'], 'param_valuelabels':['cities', 'countries']}
     ]},
   "location_separation_radius": {
     'text': 'with a separation radius of',
@@ -1025,7 +1025,7 @@ function update_condition_parameters(condition, rule_parameter_span) {
         break;
 
       case "select":
-        var selection = create_selection(modifier.param_values, modifier.param_values);
+        var selection = create_selection(modifier.param_values, modifier.param_valuelabels);
         $(selection).data('name', modifier.names[0])
         rule_parameter_span.appendChild(selection);
       }

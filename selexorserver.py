@@ -70,7 +70,6 @@
 """
 
 import sys
-import selexordatabase
 import seattleclearinghouse_xmlrpc as xmlrpc_client
 import time
 import copy
@@ -82,10 +81,10 @@ import cPickle
 import os
 import fastnmclient
 import threading
-from collections import deque
 import traceback
 import selexorexceptions
 import logging
+import MySQLdb
 
 
 # Set up the logger
@@ -185,16 +184,15 @@ class SelexorServer:
 
     '''
     self.name = database_name
+    
+    self.configuration = selexorhelper.load_config_with_file('default', {})
+    self.configuration = selexorhelper.load_config_with_file(database_name, self.configuration)
+    
     self.clearinghouse_xmlrpc_uri = clearinghouse_xmlrpc_uri
     self._use_emulated_xmlrpc = use_emulated_xmlrpc
 
-    self.database = selexordatabase.database(
-                  database_name,
-                  nodestate_transition_key = nodestate_transition_key,
-                  geoip_server_uri = geoip_server_uri,
-                  begin_probing = begin_probing,
-                  update_threadcount = update_threadcount,
-                  probe_delay = probe_delay)
+    # Remove this when done!
+    self.database = None
 
     self._accepting_requests = True
     self._running = True
@@ -228,8 +226,6 @@ class SelexorServer:
     '''
     self._accepting_requests = False
     self._running = False
-    self.database.stop_probing()
-    self.database.shutdown()
 
 
   def release_vessels(self, authdata, vessels_to_release, remoteip):
@@ -286,7 +282,7 @@ class SelexorServer:
         client.release_resources([vessel])
 
       # Assume all the vessels were released successfully
-      self.database.mark_handles_as_unallocated(handles_of_vessels_to_release)
+      # self.database.mark_handles_as_unallocated(handles_of_vessels_to_release)
       num_released = len(handles_of_vessels_to_release)
 
       # Remove vessel entries from the groups tables.
@@ -320,6 +316,10 @@ class SelexorServer:
       'group_id': 'group_status'
 
     '''
+    db, cursor = selexorhelper.connect_to_db(self.configuration)
+
+    cursor = db.cursor()
+        
     data = {'groups':{}}
     try:
       username = authinfo.keys()[0]
@@ -340,13 +340,14 @@ class SelexorServer:
           
         group_data['vessels_acquired'] = []
         for handle in group['acquired']:
-          handle_entry = self.database.handle_table[handle]
-          nodeinfo = {
-            'node_ip': handle_entry['ip'],
-            'vesselname': handle_entry['vesselname'],
-            'handle': handle,
-            'node_port': handle_entry['node_port']
-          }
+          nodeinfo = {}
+          
+          nodekey, nodeinfo['vesselname'] = handle.split(':')
+          cursor.execute('SELECT nodelocation FROM nodes WHERE nodekey="'+nodekey+'"')
+          nodelocation = cursor.fetchone()[0]
+          nodeinfo['node_ip'], nodeinfo['node_port'] = nodelocation.split(':')
+          nodeinfo['handle'] = handle
+          
           group_data['vessels_acquired'].append(nodeinfo)
           
         group_data['target_num_vessels'] = group['allocate']
@@ -356,7 +357,8 @@ class SelexorServer:
     return data
 
 
-  def resolve_node(self, identity, client, node, port):
+  def resolve_node(self, identity, client, node, port, db, cursor):
+    
     # We should never run into these...
     if node['status'] == "resolved":
       logger.error(str(identity) + ": Group already resolved: " + str(node))
@@ -369,107 +371,101 @@ class SelexorServer:
     vessels_to_acquire = []
     remaining = node['allocate'] - len(node['acquired'])
 
-    if port and not port in self.database.ports_table:
-      logger.info(str(identity) + ": No vessels with port " + str(port))
+    if port: 
+      cursor.execute("SELECT nodelocation, vesselname FROM vesselports WHERE port="+str(port))
     else:
-      # Get vessels that match the vessel rules
-      handles_vesselrulematch = parser.apply_vessel_rules(
+      cursor.execute("SELECT nodelocation, vesselname FROM vesselports")
+    handles_portmatch = cursor.fetchall()
+    
+    # Get vessels that match the vessel rules
+    handles_vesselrulematch = parser.apply_vessel_rules(node['rules'], cursor, handles_portmatch)
+    logger.info(str(identity) + ": Vessel-level matches: " + str(len(handles_vesselrulematch)))
+
+    # The number of times we tried to resolve this group in the current attempt
+    in_group_retry_count = 0
+    MAX_IN_GROUP_RETRIES = 3
+
+    while len(node['acquired']) < remaining and \
+          in_group_retry_count < MAX_IN_GROUP_RETRIES:
+
+      if not self._running:
+        # Stop if we receive a quit message
+        break
+
+      if node['pass'] >= MAX_PASSES_PER_NODE:
+        raise selexorexceptions.SelexorInternalError("Performing more passes than max pass!")
+
+      handles_grouprulematch = parser.apply_group_rules(
+          cursor = cursor,
+          acquired_vessels = node['acquired'],
           rules = node['rules'],
-          database = self.database,
-          vesselset = self.database.get_accessible_vessels(port = port))
-      logger.info(str(identity) + ": Vessel-level matches: " + str(len(handles_vesselrulematch)))
+          vesselset = handles_vesselrulematch)
 
-      # The number of times we tried to resolve this group in the current attempt
-      in_group_retry_count = 0
-      MAX_IN_GROUP_RETRIES = 3
+      # Try each vessel until we successfully acquire one
+      vessellist = list(handles_grouprulematch)
+      while vessellist:
+        logger.info(str(identity) + ": Candidates for next vessel: " + str(len(vessellist)))
+        # If we run out of handles, we simply get another random one, instead of
+        # programming a special case.
+        nodelocation, vesselname = random.choice(vessellist)
+        vessellist.remove((nodelocation, vesselname))
+        try:
+          cursor.execute('SELECT nodekey FROM nodes WHERE nodelocation="'+nodelocation+'"')
+          nodekey = cursor.fetchone()[0]
+          handle = nodekey + ':' + vesselname
+          
+          acquired_vesseldicts = client.acquire_specific_vessels([handle])
+          # This vessel will be acquired regardless of whether or not acquisition
+          # succeeded or not
+          acquired_handles = get_handle_list_from_vesseldicts(acquired_vesseldicts)
+##            self.database.mark_handles_as_allocated(acquired_handles)
 
-      while len(node['acquired']) < remaining and \
-            in_group_retry_count < MAX_IN_GROUP_RETRIES:
+          if acquired_vesseldicts:
+            logger.info(str(identity) + ": Acquired " + str(acquired_handles))
+            node['acquired'] += acquired_handles  # Should be 1
+            break
+        except xmlrpc_client.NotEnoughCreditsError, e:
+          logger.error(str(identity) + ": Not enough vessel credits")
+          raise
+        except xmlrpc_client.InvalidRequestError, e:
+          logger.error(str(identity) + ": " + str(e))
+##            self.database.invalid_handles.add(handle)
+          continue
+        except Exception, e:
+          logger.error(str(identity) +": Unknown error while acquiring vessels\n" + traceback.format_exc())
+          raise selexorexceptions.SelexorInternalError(str(e))
 
-        if not self._running:
-          # Stop if we receive a quit message
+      # We ran out of vessels to check
+      else:
+        logger.info(str(identity) + ": Can't find any suitable vessels!")
+        in_group_retry_count += 1
+
+        # Have we exceeded the maximum in-group retry count?
+        if in_group_retry_count >= MAX_IN_GROUP_RETRIES:
           break
 
-        if node['pass'] < MAX_PASSES_PER_NODE:
-          # Make sure the vesselset is updated
-          handles_vesselrulematch = self.database.get_accessible_vessels(vesselset = handles_vesselrulematch)
+        # We retry if there could be another combination that MIGHT satisfy
+        # the group rules. If there are no group rules, there is no point
+        # to retry.
+        if not parser.has_group_rules(node['rules']):
+          logger.info(str(identity) + ": There are no group rules applied; no point in retrying.")
+          break
 
-        elif node['pass'] == MAX_PASSES_PER_NODE:
-          # Perform last attempt, get fresh set of nodes
-          handles_vesselrulematch = parser.apply_vessel_rules(
-            rules = node['rules'],
-            database = self.database,
-            vesselset = self.database.get_accessible_vessels(port = port))
-        else:
-          raise selexorexceptions.SelexorInternalError("Performing more passes than max pass!")
+        if node['acquired']:
+          # Get the vessel that causes the largest drop in the
+          # size of the available vessel pool
+          worst_vessel = parser.get_worst_vessel(
+              node['acquired'],
+              handles_grouprulematch,
+              cursor,
+              node['rules'])
 
-        handles_grouprulematch = parser.apply_group_rules(
-            database = self.database,
-            acquired_vessels = node['acquired'],
-            rules = node['rules'],
-            vesselset = handles_vesselrulematch)
-
-        # Try each vessel until we successfully acquire one
-        handle_list = list(handles_grouprulematch)
-        while handle_list:
-          logger.info(str(identity) + ": Candidates for next vessel: " + str(len(handle_list)))
-          # If we run out of handles, we simply get another random one, instead of
-          # programming a special case.
-          handle = random.choice(handle_list)
-          handle_list.remove(handle)
-          try:
-            acquired_vesseldicts = client.acquire_specific_vessels([handle])
-            # This vessel will be acquired regardless of whether or not acquisition
-            # succeeded or not
-            acquired_handles = get_handle_list_from_vesseldicts(acquired_vesseldicts)
-            self.database.mark_handles_as_allocated(acquired_handles)
-
-            if acquired_vesseldicts:
-              logger.info(str(identity) + ": Acquired " + str(acquired_handles))
-              node['acquired'] += acquired_handles  # Should be 1
-              break
-          except xmlrpc_client.NotEnoughCreditsError, e:
-            logger.error(str(identity) + ": Not enough vessel credits")
-            raise
-          except xmlrpc_client.InvalidRequestError, e:
-            logger.error(str(identity) + ": " + str(e))
-            self.database.invalid_handles.add(handle)
-            continue
-          except Exception, e:
-            logger.error(str(identity) +": Unknown error while acquiring vessels\n" + traceback.format_exc())
-            raise selexorexceptions.SelexorInternalError(str(e))
-
-        # We ran out of vessels to check
-        else:
-          logger.info(str(identity) + ": Can't find any suitable vessels!")
-          in_group_retry_count += 1
-
-          # Have we exceeded the maximum in-group retry count?
-          if in_group_retry_count > MAX_IN_GROUP_RETRIES:
-            break
-
-          # We retry if there could be another combination that MIGHT satisfy
-          # the group rules. If there are no group rules, there is no point
-          # to retry.
-          if not parser.has_group_rules(node['rules']):
-            logger.info(str(identity) + ": There are no group rules applied; no point in retrying.")
-            break
-
-          if node['acquired']:
-            # Get the vessel that causes the largest drop in the
-            # size of the available vessel pool
-            worst_vessel = parser.get_worst_vessel(
-                node['acquired'],
-                handles_grouprulematch,
-                self.database,
-                node['rules'])
-
-            # Release the worst vessel so that we can try to get a better one
-            # in the next iteration
-            logger.info(str(identity) + ": Releasing: " + str(worst_vessel))
-            node['acquired'].remove(worst_vessel)
-            client.release_resources([worst_vessel])
-            self.database.mark_handles_as_unallocated([worst_vessel])
+          # Release the worst vessel so that we can try to get a better one
+          # in the next iteration
+          logger.info(str(identity) + ": Releasing: " + str(worst_vessel))
+          node['acquired'].remove(worst_vessel)
+          client.release_resources([worst_vessel])
+##            self.database.mark_handles_as_unallocated([worst_vessel])
 
     node['pass'] += 1
     if node['pass'] >= MAX_PASSES_PER_NODE:
@@ -609,6 +605,8 @@ class SelexorServer:
     logger.info(str(identity) + ": Request data:\n" + str(request_data))
     incomplete_groups = copy.copy(request_data['groups'])
     next_groupname = _get_next_group_to_resolve(request_data)
+    
+    db, cursor = selexorhelper.connect_to_db(self.configuration)
 
     # Start processing loop
     while   incomplete_groups and\
@@ -619,7 +617,7 @@ class SelexorServer:
       group = request_data['groups'][next_groupname]
       try:
         logger.info(str(identity) + ": Resolving group: " + str(group))
-        group = self.resolve_node(identity, client, group, port)
+        group = self.resolve_node(identity, client, group, port, db, cursor)
       except xmlrpc_client.NotEnoughCreditsError, e:
         group['status'] = 'error'
         group['error'] = str(e)

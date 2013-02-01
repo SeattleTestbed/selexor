@@ -74,8 +74,8 @@ def main():
   # Load the default configuration file, then overwrite the configuration with
   # the data stored in the server-specific configuration file.
   configuration = {}
-  configuration = _load_config_with_file('default', configuration)
-  configuration = _load_config_with_file(instance_name, configuration)
+  configuration = selexorhelper.load_config_with_file('default', configuration)
+  configuration = selexorhelper.load_config_with_file(instance_name, configuration)
   context['configuration'] = configuration
 
   # Generate the index file for this configuration
@@ -114,79 +114,6 @@ def main():
   selexor_server.shutdown()
   print "Shutdown Complete."
 
-
-
-def _load_config_with_file(configname, configuration):
-  '''
-  <Purpose>
-    Loads the configuration file and applies the changes listed to the 
-    configuration.
-    
-  <Arguments>
-    configname: 
-      The name of the configuration file to open, without the '.conf' extension.
-    configuration:
-      The configuration dictionary to modify. This can be empty.
-      
-  <Side Effects>
-    Opens the configuration file named configfn + '.conf', and loads the
-    configuration details into a dict.
-    All whitespace surrounding key/value entries in the configuration file will 
-    be ignored. e.g. "  hello world  " and "hello world" are identical.
-
-  <Exceptions>
-    None
-    
-  <Returns>
-    The modified configuration.
-    
-  '''
-  
-  # The parameters that require casts. 
-  # Keys are the parameter names, values are the types to cast to. 
-  cast_type = {
-    'http_port': int,
-    'advertise_port': int,
-    'num_probe_threads': int,
-    'probe_delay': int,
-    'allow_ssl_insecure': bool,
-    'use_emulated_xmlrpc': bool
-  }
-
-  configuration['server_name'] = configname
-  configfile = open(configname + '.conf', 'r')
-
-  # File parse loop.
-  data = configfile.readline()
-  while data:
-    # Characters after '#' are comments.
-    # Take all characters preceding it and get rid of any surrounding whitespace.
-    data = data.split('#', 1)[0].strip()
-    # Ignore empty strings
-    if data:
-      # Each entry is in the format of: "Key: Value"
-      key, value = data.split(":", 1)
-      key = key.strip()
-      value = value.strip()
-      # Cast to correct type if needed
-      if key in cast_type:
-        # Default bool casting would require users to type '' -> False, and 
-        # anything else -> True.
-        if cast_type[key] == bool:
-          if value.lower() == 'true':
-            value = True
-          elif value.lower() == 'false':
-            value = False
-          else:
-            raise ValueError("Invalid value '" + value + "' for key '" + key + 
-              "' in config " + configname + ", expected " + str(cast_type[key]))
-        else:
-          value = cast_type[key](value)
-      # Insert into configuration
-      configuration[key] = value
-    data = configfile.readline()
-    # End of file parse loop
-  return configuration
 
 
 def _generate_request_form(config):
@@ -307,7 +234,6 @@ class SelexorHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     <Returns>
       None
     '''
-    
     # The handlers should take the following parameters:
     # data: The data expected by the handler. 
     # remoteip: The IP address of the remote machine. 
