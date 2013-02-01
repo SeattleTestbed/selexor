@@ -391,6 +391,7 @@ class SelexorHandler(BaseHTTPServer.BaseHTTPRequestHandler):
       response_dict['error'] = "SeleXor could not connect to the clearinghouse's XMLRPC server at this moment.  Please try again later."
       response_dict['max_hosts'] = "?"
     except Exception, e:
+      logger.error("Unknown error while connecting to the XMLRPC server.\n"+traceback.format_exc())
       response_dict['status'] = 'error'
       response_dict['error'] = "An internal server error occurred."
       response_dict['max_hosts'] = "?"
