@@ -89,7 +89,14 @@ def connect_to_clearinghouse(authdata, allow_ssl_insecure = False, xmlrpc_url = 
   if not (apikey or private_key_string):
     raise selexorexceptions.SelexorAuthenticationFailed("Either apikey or privatekey must be given!")
 
-  client = seattleclearinghouse_xmlrpc.SeattleClearinghouseClient(
+  if xmlrpc_url == 'default':
+    client = seattleclearinghouse_xmlrpc.SeattleClearinghouseClient(
+      username = username,
+      api_key = apikey,
+      private_key_string = private_key_string,
+      allow_ssl_insecure = allow_ssl_insecure)
+  else:
+    client = seattleclearinghouse_xmlrpc.SeattleClearinghouseClient(
       username = username,
       api_key = apikey,
       xmlrpc_url = xmlrpc_url,
@@ -131,3 +138,7 @@ def get_handle_location(handle, loctype, database):
   if loctype == 'countries':
     return (database.handle_table[handle]['geographic']['country_code'],)
   raise UnknownLocationType(loctype)
+
+
+
+initialize()
