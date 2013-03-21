@@ -17,7 +17,6 @@ import math
 import selexorexceptions
 import os
 import seattleclearinghouse_xmlrpc
-import selexor_dummy_xmlrpc_client
 import MySQLdb
 
 helpercontext = {}
@@ -122,8 +121,7 @@ def load_config_with_file(configname, configuration):
     'advertise_port': int,
     'num_probe_threads': int,
     'probe_delay': int,
-    'allow_ssl_insecure': bool,
-    'use_emulated_xmlrpc': bool
+    'allow_ssl_insecure': bool
   }
 
   configuration['server_name'] = configname
@@ -192,7 +190,7 @@ def load_ids(idtype):
   return id_map
 
 
-def connect_to_clearinghouse(authdata, allow_ssl_insecure = False, xmlrpc_url = None, use_emulated_client=False):
+def connect_to_clearinghouse(authdata, allow_ssl_insecure = False, xmlrpc_url = None):
   '''
   <Purpose>
     Wrapper for a SeattleClearinghouseClient constructor.
@@ -211,9 +209,6 @@ def connect_to_clearinghouse(authdata, allow_ssl_insecure = False, xmlrpc_url = 
   username = authdata.keys()[0]
   apikey = None
   private_key_string = None
-
-  if use_emulated_client:
-    return selexor_dummy_xmlrpc_client.DummySeattleClearinghouseClient(username)
 
   if 'apikey' in authdata[username]:
     apikey = authdata[username]['apikey']

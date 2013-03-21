@@ -155,8 +155,7 @@ class SelexorServer:
                begin_probing = True,
                update_threadcount = None,
                allow_ssl_insecure = False,
-               probe_delay = 300,
-               use_emulated_xmlrpc = False):
+               probe_delay = 300):
     '''
     <Purpose>
       Creates an instance of a selexor server.
@@ -189,7 +188,6 @@ class SelexorServer:
     self.configuration = selexorhelper.load_config_with_file(database_name, self.configuration)
     
     self.clearinghouse_xmlrpc_uri = clearinghouse_xmlrpc_uri
-    self._use_emulated_xmlrpc = use_emulated_xmlrpc
 
     # Remove this when done!
     self.database = None
@@ -271,9 +269,10 @@ class SelexorServer:
           except fastnmclient.NMClientException, e:
             logger.info("Failed to look up vessel "+vessel_location+' through nodemanager: '+ str(e))
           
-      client = selexorhelper.connect_to_clearinghouse(authdata, 
-          self.allow_ssl_insecure, self.clearinghouse_xmlrpc_uri, 
-          use_emulated_client=self._use_emulated_xmlrpc)
+      client = selexorhelper.connect_to_clearinghouse(
+                  authdata, 
+                  self.allow_ssl_insecure, 
+                  self.clearinghouse_xmlrpc_uri)
       
       # Release the remaining vessels
       for vessel in handles_of_vessels_to_release:
@@ -542,7 +541,10 @@ class SelexorServer:
 
     if request_data['status'] == 'accepted':
       try:
-        client = selexorhelper.connect_to_clearinghouse(authinfo, self.allow_ssl_insecure, self.clearinghouse_xmlrpc_uri, use_emulated_client=self._use_emulated_xmlrpc)
+        client = selexorhelper.connect_to_clearinghouse(
+                    authinfo, 
+                    self.allow_ssl_insecure, 
+                    self.clearinghouse_xmlrpc_uri)
       except selexorexceptions.SelexorException, e:
         request_data['status'] = 'error'
         request_data['error'] = str(e)
