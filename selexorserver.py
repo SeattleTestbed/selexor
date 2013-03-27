@@ -76,7 +76,6 @@ import copy
 import selexorruleparser as parser
 import selexorhelper
 import random
-import rsa_repy
 import cPickle
 import os
 import fastnmclient
@@ -85,6 +84,9 @@ import traceback
 import selexorexceptions
 import logging
 import MySQLdb
+
+import repyhelper
+repyhelper.translate_and_import('rsa_repy')
 
 
 # Set up the logger

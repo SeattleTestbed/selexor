@@ -31,14 +31,18 @@ import os
 import sys
 import threading
 import seattleclearinghouse_xmlrpc   # Needed for checking auth. exceptions
-import serialize_repy   # Used for serializing objects to comm. with clients
-import rsa_repy   # Used to read the nodestate transition key
 import logging
 import traceback
 import selexorhelper
 # Raised when we cannot connect to the clearinghouse XMLRPC server
 from xmlrpclib import ProtocolError
 from time import sleep
+
+import repyhelper
+# Used for serializing objects to comm. with clients
+repyhelper.translate_and_import('serialize.repy')
+# Used to read the nodestate transition key
+repyhelper.translate_and_import('rsa_repy')   
 
 # Set up the logger
 log_filehandler = logging.FileHandler('web_server.log', 'a')
