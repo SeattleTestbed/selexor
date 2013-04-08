@@ -86,7 +86,7 @@ import logging
 import MySQLdb
 
 import repyhelper
-repyhelper.translate_and_import('rsa_repy')
+repyhelper.translate_and_import('rsa.repy')
 
 
 # Set up the logger
@@ -744,5 +744,5 @@ def get_handle_from_nodehandle(nodehandle):
     vesseldict = fastnmclient.nmclient_getvesseldict(nmhandle)
   finally:
     fastnmclient.nmclient_destroyhandle(nmhandle)
-  return rsa_repy.rsa_publickey_to_string(vesseldict['nodekey']) + ':' + vesselname
+  return rsa_publickey_to_string(vesseldict['nodekey']) + ':' + vesselname
 

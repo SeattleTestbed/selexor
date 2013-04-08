@@ -42,7 +42,7 @@ import repyhelper
 # Used for serializing objects to comm. with clients
 repyhelper.translate_and_import('serialize.repy')
 # Used to read the nodestate transition key
-repyhelper.translate_and_import('rsa_repy')   
+repyhelper.translate_and_import('rsa.repy')   
 
 # Set up the logger
 log_filehandler = logging.FileHandler('web_server.log', 'a')
@@ -88,7 +88,7 @@ def main():
   http_server = BaseHTTPServer.HTTPServer((configuration['http_ip'], configuration['http_port']), SelexorHandler)
   http_thread = threading.Thread(target=http_server.serve_forever)
 
-  nodestate_transition_key = rsa_repy.rsa_file_to_publickey(configuration['nodestate_transition_key_fn'])
+  nodestate_transition_key = rsa_file_to_publickey(configuration['nodestate_transition_key_fn'])
   
   context['selexor_server'] = selexor_server = selexorserver.SelexorServer(
       instance_name,
@@ -256,7 +256,7 @@ class SelexorHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     rawdata = self.rfile.read(int(self.headers.getheader("Content-Length")))
     response = {}
     try:
-      postdict = serialize_repy.serialize_deserializedata(rawdata)
+      postdict = serialize_deserializedata(rawdata)
       action = postdict.keys()[0]
       response['action'] = action + "_response"
       if action in self.action_handlers:
@@ -277,7 +277,7 @@ class SelexorHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     self.send_response(200)
     self.end_headers()
 
-    output = serialize_repy.serialize_serializedata(response)
+    output = serialize_serializedata(response)
     self.wfile.write(output)
 
 
