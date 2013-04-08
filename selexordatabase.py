@@ -232,7 +232,14 @@ def contact_vessels_and_update_database(configuration, nodes_to_check):
       try:
         # We need to some initial value so that it is not undefined when we check it later.
         geoinfo = None
-        geoinfo = geoip_record_by_addr(nodeinfo['id'])
+
+        # Only retrieve the geographic information if we don't have it already
+        # The geoip server's data doesn't change, so we don't need to constantly update it.
+        geoinfo_exists = autoretry_mysql_command(cursor, "SELECT nodekey FROM nodes WHERE nodelocation='"+nodelocation+"'") == 1L
+        if not geoinfo_exists:
+          logger.info("Location data not in database, looking up on geoip: "+nodelocation)
+          geoinfo = geoip_record_by_addr(nodeinfo['id'])
+
       except Exception, e:
         if not "Unable to contact the geoip server" in str(e):
           raise
@@ -311,23 +318,26 @@ def commit_data_to_database(db, cursor, nodelocation, node_dict, ports, geoinfo)
       cursor.execute("INSERT INTO vesselports (nodelocation, vesselname, port) VALUE ('"+nodelocation+"', '"+vesselname+"',"+str(port)+")")
 
   # == Update Location Table ==
-  if new_node:
-    cursor.execute("INSERT INTO location (nodelocation) VALUE ('"+nodelocation+"')")
+  # Only update location information if it is provided.
+  # Geoinfo is an empty dict if we don't have new information.
+  if geoinfo:
+    if new_node:
+      cursor.execute("INSERT INTO location (nodelocation) VALUE ('"+nodelocation+"')")
 
-  # Now update the database with the new information
-  # First, the string types...
-  for key in ['city', 'country_code']:
-    if key in geoinfo:
-      autoretry_mysql_command(cursor, "UPDATE location SET "+key+"='"+geoinfo[key]+"' WHERE nodelocation='"+nodelocation+"'")
-    else:
-      autoretry_mysql_command(cursor, "UPDATE location SET "+key+"=NULL WHERE nodelocation='"+nodelocation+"'")
+    # Now update the database with the new information
+    # First, the string types...
+    for key in ['city', 'country_code']:
+      if key in geoinfo:
+        autoretry_mysql_command(cursor, "UPDATE location SET "+key+"='"+geoinfo[key]+"' WHERE nodelocation='"+nodelocation+"'")
+      else:
+        autoretry_mysql_command(cursor, "UPDATE location SET "+key+"=NULL WHERE nodelocation='"+nodelocation+"'")
 
-  # Now, the double types
-  for key in ['longitude', 'latitude']:
-    if key in geoinfo:
-      autoretry_mysql_command(cursor, "UPDATE location SET "+key+"="+str(geoinfo[key])+" WHERE nodelocation='"+nodelocation+"'")
-    else:
-      autoretry_mysql_command(cursor, "UPDATE location SET "+key+"=NULL WHERE nodelocation='"+nodelocation+"'")
+    # Now, the double types
+    for key in ['longitude', 'latitude']:
+      if key in geoinfo:
+        autoretry_mysql_command(cursor, "UPDATE location SET "+key+"="+str(geoinfo[key])+" WHERE nodelocation='"+nodelocation+"'")
+      else:
+        autoretry_mysql_command(cursor, "UPDATE location SET "+key+"=NULL WHERE nodelocation='"+nodelocation+"'")
 
   db.commit()
 
