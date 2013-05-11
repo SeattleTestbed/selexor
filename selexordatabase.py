@@ -42,6 +42,7 @@ import repyhelper
 repyhelper.translate_and_import("geoip_client.repy")
 repyhelper.translate_and_import('nmclient.repy')
 repyhelper.translate_and_import('advertise.repy')
+repyhelper.translate_and_import('rsa.repy')
 import settings
 import sys
 import threading
