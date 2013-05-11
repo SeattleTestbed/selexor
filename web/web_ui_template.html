@@ -15,7 +15,7 @@
 
 <body>
 	<div id="selexor_main" class="capsule">
-		<h1 id="selexor_title">SeleXor - <a href="{{ CLEARINGHOUSE_URL }}">{{ CLEARINGHOUSE_NAME }}</a></h1>
+		<h1 id="selexor_title">SeleXor - <a href="{{ clearinghouse_url }}">{{ clearinghouse_name }}</a></h1>
 		<h2 id="selexor_subtitle">Seattle Advanced Vessel Selection Tool</h2>
 		<table id="auth_table">
 		<tr>
@@ -24,7 +24,7 @@
 		</tr>
 		<tr>
       <!-- We don't want the user to be able to tab into this anchor -->
-			<td id="apikey_label">API Key<a href="{{ CLEARINGHOUSE_URL }}/html/api_info" tabindex='-1'><span id='apikey_tooltip'></span></a>
+			<td id="apikey_label">API Key<a href="{{ clearinghouse_url }}/html/api_info" tabindex='-1'><span id='apikey_tooltip'></span></a>
       </td>
 			<td><input type="text" class="authentication_input" id="apikey_text" /></td>
 		</tr>

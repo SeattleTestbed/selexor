@@ -42,6 +42,7 @@ import repyhelper
 repyhelper.translate_and_import("geoip_client.repy")
 repyhelper.translate_and_import('nmclient.repy')
 repyhelper.translate_and_import('advertise.repy')
+import settings
 import sys
 import threading
 import time
@@ -109,16 +110,15 @@ def format_geoinfo(geoinfo):
       geoinfo[location_type] = geoinfo[location_type].lower()
 
 
-def probe_for_vessels(configuration):
+def probe_for_vessels():
   print "Probing for vessels..."
   # Look up as many values as possible
-  nodes_to_check = advertise_lookup(configuration['node_state_transition_key'], maxvals=2**32)
-  # nodes_to_check = advertise_lookup(configuration['node_state_transition_key'], maxvals=5)[:5]
+  nodes_to_check = advertise_lookup(nodestate_transition_key, maxvals=2**32)
   logger.info("Found " +str(len(nodes_to_check))+ " nodes")
   print "Found " +str(len(nodes_to_check))+ " nodes"
 
   update_threads = []
-  for thread_no in range(128):
+  for thread_no in range(settings.num_probe_threads):
     thread = threading.Thread(
         target = contact_vessels_and_update_database,
         args=(configuration, nodes_to_check))
@@ -143,12 +143,11 @@ def probe_for_vessels(configuration):
   logger.info("Finished probing.")
 
 
-
-def create_database(configuration):
+def create_database():
   """
-  Behaves in a similar manner as syncdb.  Creates any missing tables.
+  Creates any missing tables.
   """
-  db, cursor = selexorhelper.connect_to_db(configuration)
+  db, cursor = selexorhelper.connect_to_db()
 
   # Do the tables we need exist?
   cursor.execute("show tables")
@@ -191,7 +190,7 @@ latitude double
       cursor.execute("CREATE TABLE "+table+" ("+tables_contents[table]+")")
 
 
-def contact_vessels_and_update_database(configuration, nodes_to_check):
+def contact_vessels_and_update_database(nodes_to_check):
   '''
   Of all nodes that need checking, take one node.
   Obtain its:
@@ -204,7 +203,7 @@ def contact_vessels_and_update_database(configuration, nodes_to_check):
   Finally, update the information about these nodes.
 
   '''
-  db, cursor = selexorhelper.connect_to_db(configuration)
+  db, cursor = selexorhelper.connect_to_db()
 
   while nodes_to_check:
     nodelocation = nodes_to_check.pop()
@@ -344,19 +343,14 @@ def commit_data_to_database(db, cursor, nodelocation, node_dict, ports, geoinfo)
 
 
 if __name__=='__main__':
-  # Connections to the database need to know what configurations to use
-  global configuration
-  configname = sys.argv[1]
-  configuration = {}
-  configuration = selexorhelper.load_config_with_file('default', configuration)
-  configuration = selexorhelper.load_config_with_file(configname, configuration)
+  global nodestate_transition_key
 
-  configuration['node_state_transition_key'] = rsa_file_to_publickey(configuration['nodestate_transition_key_fn'])
+  nodestate_transition_key = rsa_file_to_publickey(settings.path_to_nodestate_transition_key)
 
   geoip_init_client()
 
   # Create the databases if they haven't been created
-  create_database(configuration)
+  create_database()
 
   print "Probing service has started!"
   print "Press CTRL+C to stop the server."
@@ -364,7 +358,7 @@ if __name__=='__main__':
   # Run until Ctrl+C is issued
   try:
     while True:
-      probe_for_vessels(configuration)
-      time.sleep(5);
+      probe_for_vessels()
+      time.sleep(settings.probe_delay);
   except KeyboardInterrupt:
     pass

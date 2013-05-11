@@ -34,6 +34,8 @@ import seattleclearinghouse_xmlrpc   # Needed for checking auth. exceptions
 import logging
 import traceback
 import selexorhelper
+import settings
+import substitutions
 # Raised when we cannot connect to the clearinghouse XMLRPC server
 from xmlrpclib import ProtocolError
 from time import sleep
@@ -75,34 +77,18 @@ def main():
 
   instance_name = sys.argv[1]
 
-  # Load the default configuration file, then overwrite the configuration with
-  # the data stored in the server-specific configuration file.
-  configuration = {}
-  configuration = selexorhelper.load_config_with_file('default', configuration)
-  configuration = selexorhelper.load_config_with_file(instance_name, configuration)
-  context['configuration'] = configuration
-
-  # Generate the index file for this configuration
-  _generate_request_form(configuration)
+  # Generate the index file
+  _generate_request_form()
   
-  http_server = BaseHTTPServer.HTTPServer((configuration['http_ip'], configuration['http_port']), SelexorHandler)
+  http_server = BaseHTTPServer.HTTPServer((settings.http_ip_addr, settings.http_port), SelexorHandler)
   http_thread = threading.Thread(target=http_server.serve_forever)
-
-  nodestate_transition_key = rsa_file_to_publickey(configuration['nodestate_transition_key_fn'])
+  nodestate_transition_key = rsa_file_to_publickey(settings.path_to_nodestate_transition_key)
   
-  context['selexor_server'] = selexor_server = selexorserver.SelexorServer(
-      instance_name,
-      nodestate_transition_key = nodestate_transition_key,
-      clearinghouse_xmlrpc_uri = configuration['xmlrpc_url'],
-      geoip_server_uri = configuration['geoip_url'],
-      begin_probing = True,
-      allow_ssl_insecure = configuration['allow_ssl_insecure'],
-      update_threadcount = configuration['num_probe_threads'],
-      probe_delay = configuration['probe_delay'])
+  context['selexor_server'] = selexorserver.SelexorServer()
   
 
   http_thread.start()
-  print "Listening for connections on", configuration['http_ip'] + ':' + str(configuration['http_port'])
+  print "Listening for connections on", settings.http_ip_addr + ':' + str(settings.http_port)
 
   # Run indefinitely until CTRL+C is pressed.
   try:
@@ -119,11 +105,11 @@ def main():
 
 
 
-def _generate_request_form(config):
+def _generate_request_form():
   '''
   <Purpose>
     Takes the web index file and replaces every instance of [[ VAR_NAME ]] with its
-    substitution, found within config. The outputted file will be servername_index.html.
+    substitution, found within config. The outputted file will be index.html.
   <Parameters>
     config: A dictionary obtained from _modify_config_with_file().
   <Exceptions>
@@ -134,7 +120,7 @@ def _generate_request_form(config):
     None
 
   '''
-  outputfn = config['server_name'] + "_index.html"
+  outputfn = "index.html"
 
   # This is the source file to parse
   srcfile = open(os.path.normpath(context['WEB_PATH'] + 'web_ui_template.html'), 'r')
@@ -150,11 +136,11 @@ def _generate_request_form(config):
       before, remainder = data.split('{{', 1)
       token, remainder = remainder.split('}}', 1)
       token = token.strip()
-      # If a replacement cannot be found, it is an error
-      if token in config:
-        replacement = config[token]
-      else:
-        raise NameError("Unknown token: '" + token + "' on line " + str(lineno))
+      
+      # We have no way of determining ahead of time which substitutions will
+      # be defined without having to list them here...  If it isn't defined, 
+      # then let's just allow the exception to terminate the program.
+      replacement = getattr(substitutions, token)
       result = before + replacement
       destfile.write(result)
 
@@ -299,10 +285,7 @@ class SelexorHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     '''
     response_dict = {}
     try:
-      client = selexorhelper.connect_to_clearinghouse(
-          data, 
-          context['configuration']['allow_ssl_insecure'], 
-          context['configuration']['xmlrpc_url'])
+      client = selexorhelper.connect_to_clearinghouse(data)
       accinfo = client.get_account_info()
       acquired_resources = client.get_resource_info()
 

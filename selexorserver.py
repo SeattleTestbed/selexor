@@ -84,6 +84,7 @@ import traceback
 import selexorexceptions
 import logging
 import MySQLdb
+import settings
 
 import repyhelper
 repyhelper.translate_and_import('rsa.repy')
@@ -149,32 +150,12 @@ def _get_next_group_to_resolve(requestdict):
 
 
 class SelexorServer:
-  def __init__(self,
-               database_name,
-               nodestate_transition_key,
-               clearinghouse_xmlrpc_uri = None,
-               geoip_server_uri = None,
-               begin_probing = True,
-               update_threadcount = None,
-               allow_ssl_insecure = False,
-               probe_delay = 300):
+  def __init__(self):
     '''
     <Purpose>
       Creates an instance of a selexor server.
     <Arguments>
-      database_name:
-        The name of the database.
-      nodestate_transition_key:
-        The public key of the Clearinghouse.
-      clearinghouse_xmlrpc_uri:
-        The URI of the XMLRPC server for the Clearinghouse. Set to None to use
-        the default (Seattle Clearinghouse XMLRPC server)
-      geoip_server_uri:
-        The GEOIP server to use to determine node locations.
-      begin_probing:
-        If set to True, the database will start probing.
-      update_threadcount:
-        The number of threads to use when probing for resources.
+      None
     <Side Effects>
       Initializes the GeoIP client.
       Initializes a selexordatabase.
@@ -184,26 +165,8 @@ class SelexorServer:
       A selexorserver instance.
 
     '''
-    self.name = database_name
-    
-    self.configuration = selexorhelper.load_config_with_file('default', {})
-    self.configuration = selexorhelper.load_config_with_file(database_name, self.configuration)
-    
-    self.clearinghouse_xmlrpc_uri = clearinghouse_xmlrpc_uri
-
-    # Remove this when done!
-    self.database = None
-
     self._accepting_requests = True
     self._running = True
-    
-    self.allow_ssl_insecure = allow_ssl_insecure
-
-    # The threads that are involved in resolving group requests.
-    # We keep track of these to ensure we stop resolving groups before writing
-    # the database to disk.
-    # We use the (username, ip_addr) tuple to identify threads.
-    self._resolution_threads = {}
 
 
 
@@ -271,10 +234,7 @@ class SelexorServer:
           except fastnmclient.NMClientException, e:
             logger.info("Failed to look up vessel "+vessel_location+' through nodemanager: '+ str(e))
           
-      client = selexorhelper.connect_to_clearinghouse(
-                  authdata, 
-                  self.allow_ssl_insecure, 
-                  self.clearinghouse_xmlrpc_uri)
+      client = selexorhelper.connect_to_clearinghouse(authdata)
       
       # Release the remaining vessels
       for vessel in handles_of_vessels_to_release:
@@ -317,7 +277,7 @@ class SelexorServer:
       'group_id': 'group_status'
 
     '''
-    db, cursor = selexorhelper.connect_to_db(self.configuration)
+    db, cursor = selexorhelper.connect_to_db()
 
     cursor = db.cursor()
         
@@ -543,10 +503,7 @@ class SelexorServer:
 
     if request_data['status'] == 'accepted':
       try:
-        client = selexorhelper.connect_to_clearinghouse(
-                    authinfo, 
-                    self.allow_ssl_insecure, 
-                    self.clearinghouse_xmlrpc_uri)
+        client = selexorhelper.connect_to_clearinghouse(authinfo)
       except selexorexceptions.SelexorException, e:
         request_data['status'] = 'error'
         request_data['error'] = str(e)
@@ -567,7 +524,6 @@ class SelexorServer:
       logger.error(str(identity) + ": Working on request")
       resolution_thread = threading.Thread(target=self.serve_request, args=(identity, request_data, client, port))
       resolution_thread.start()
-      self._resolution_threads[identity] = resolution_thread
 
     else:
       logger.info(str(identity) + ": Could not process request")
@@ -610,7 +566,7 @@ class SelexorServer:
     incomplete_groups = copy.copy(request_data['groups'])
     next_groupname = _get_next_group_to_resolve(request_data)
     
-    db, cursor = selexorhelper.connect_to_db(self.configuration)
+    db, cursor = selexorhelper.connect_to_db()
 
     # Start processing loop
     while   incomplete_groups and\

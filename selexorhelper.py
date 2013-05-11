@@ -18,6 +18,7 @@ import selexorexceptions
 import os
 import seattleclearinghouse_xmlrpc
 import MySQLdb
+import settings
 
 helpercontext = {}
 
@@ -190,7 +191,7 @@ def load_ids(idtype):
   return id_map
 
 
-def connect_to_clearinghouse(authdata, allow_ssl_insecure = False, xmlrpc_url = None):
+def connect_to_clearinghouse(authdata):
   '''
   <Purpose>
     Wrapper for a SeattleClearinghouseClient constructor.
@@ -217,21 +218,14 @@ def connect_to_clearinghouse(authdata, allow_ssl_insecure = False, xmlrpc_url = 
 
   if not (apikey or private_key_string):
     raise selexorexceptions.SelexorAuthenticationFailed("Either apikey or privatekey must be given!")
-
-  if xmlrpc_url == 'default':
-    client = seattleclearinghouse_xmlrpc.SeattleClearinghouseClient(
-      username = username,
-      api_key = apikey,
-      private_key_string = private_key_string,
-      allow_ssl_insecure = allow_ssl_insecure)
-  else:
-    client = seattleclearinghouse_xmlrpc.SeattleClearinghouseClient(
-      username = username,
-      api_key = apikey,
-      xmlrpc_url = xmlrpc_url,
-      private_key_string = private_key_string,
-      allow_ssl_insecure = allow_ssl_insecure)
-
+  
+  logger.info("Connecting to the clearinghouse on behalf of "+username)
+  client = seattleclearinghouse_xmlrpc.SeattleClearinghouseClient(
+    username = username,
+    api_key = apikey,
+    private_key_string = private_key_string,
+    xmlrpc_url = settings.clearinghouse_xmlrpc_url,
+    allow_ssl_insecure = settings.allow_ssl_insecure)
   return client
 
 
@@ -269,7 +263,7 @@ def get_handle_location(handle, loctype, database):
   raise UnknownLocationType(loctype)
 
 
-def connect_to_db(configuration):
+def connect_to_db():
   """
   <Purpose>
     Connect to the MySQL database using the user/pass/db specified in the 
@@ -286,8 +280,8 @@ def connect_to_db(configuration):
   
   db = MySQLdb.connect(
       host='localhost', port=3306, 
-      user=configuration['dbusername'], passwd=configuration['dbpassword'], 
-      db=configuration['dbname'])
+      user=settings.dbusername, passwd=settings.dbpassword, 
+      db=settings.dbname)
   cursor = db.cursor()
   return db, cursor
 
