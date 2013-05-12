@@ -59,12 +59,15 @@ BaseHTTPServer.BaseHTTPRequestHandler.address_string = _bare_address_string
 # End slow respond time fix for python's base http server.
 
 
-context = {}
-context['INDEX_FILE'] = 'web_ui_template.html'
-context['WEB_PATH'] = './web/'
+TEMPLATE_INDEX_FN = 'web_ui_template.html'
+INDEX_FN = 'index.html'
+WEB_PATH = './web/'
+
 
 def main():
   global logger
+  # Needed so that the event handler for the HTTP server can see the selexor server
+  global selexor_server
   if len(sys.argv) != 2:
     print "Unexpected arguments!"
     print 'Usage: $ python selexorweb.py [instance name]'
@@ -79,7 +82,7 @@ def main():
   http_thread = threading.Thread(target=http_server.serve_forever)
   nodestate_transition_key = rsa_file_to_publickey(settings.path_to_nodestate_transition_key)
   
-  context['selexor_server'] = selexorserver.SelexorServer()
+  selexor_server = selexorserver.SelexorServer()
   
 
   http_thread.start()
@@ -124,17 +127,16 @@ def _generate_request_form():
   <Exceptions>
     IOError
   <Side Effects>
-    Changes context['INDEX_FILE'] to point to the generated file.
+    Generates an index file for this instance of selexor and places it in the current directory.
   <Return>
     None
 
   '''
-  outputfn = "index.html"
 
   # This is the source file to parse
-  srcfile = open(os.path.normpath(context['WEB_PATH'] + 'web_ui_template.html'), 'r')
+  srcfile = open(os.path.normpath(WEB_PATH + TEMPLATE_FN), 'r')
   # This is the file that will contain the outputted data.
-  destfile = open(os.path.normpath(context['WEB_PATH'] + outputfn), 'w')
+  destfile = open(os.path.normpath(WEB_PATH + INDEX_FN), 'w')
 
   data = srcfile.readline()
   lineno = 0
@@ -163,7 +165,7 @@ def _generate_request_form():
 
   srcfile.close()
   destfile.close()
-  context['INDEX_FILE'] = outputfn
+
 
 
 class SelexorHandler(BaseHTTPServer.BaseHTTPRequestHandler):
@@ -171,7 +173,7 @@ class SelexorHandler(BaseHTTPServer.BaseHTTPRequestHandler):
   <Purpose>
     Selexor handler for use with the BaseHTTPServer class.
   <Side Effects>
-    Will serve requests pointing to files in the context['web_path'] directory.
+    Will serve requests pointing to files in the WEB_PATH directory.
     Also, will communicate with the selexorserver to perform user authentication
     and host requests.
   <Example Use>
@@ -186,8 +188,8 @@ class SelexorHandler(BaseHTTPServer.BaseHTTPRequestHandler):
       filepath = self.path[1:]
     else:
       # Requesting index
-      filepath = context['INDEX_FILE']
-    filepath = context['WEB_PATH'] + filepath
+      filepath = INDEX_FN
+    filepath = WEB_PATH + filepath
     
     # Write the header
     dataFile = None
@@ -319,17 +321,17 @@ class SelexorHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
   def _handle_host_request(self, data, remoteip):
     ''' Wrapper for selexor server's host request function. '''
-    return context['selexor_server'].handle_request(data['userdata'], data['groups'], data['port'], remoteip)
+    return selexor_server.handle_request(data['userdata'], data['groups'], data['port'], remoteip)
 
 
   def _handle_status_query(self, data, remoteip):
     ''' Wrapper for selexor server's status query function. '''
-    return context['selexor_server'].get_request_status(data['userdata'], remoteip)
+    return selexor_server.get_request_status(data['userdata'], remoteip)
 
 
   def _release_vessel(self, data, remoteip):
     ''' Wrapper for selexor server's vessel release function.'''
-    return context['selexor_server'].release_vessels(data['userdata'], data['vessels'], remoteip)
+    return selexor_server.release_vessels(data['userdata'], data['vessels'], remoteip)
 
 
   def _get_mime_type_from_path(self, path):
