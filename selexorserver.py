@@ -82,7 +82,6 @@ import fastnmclient
 import threading
 import traceback
 import selexorexceptions
-import logging
 import MySQLdb
 import settings
 
@@ -90,14 +89,7 @@ import repyhelper
 repyhelper.translate_and_import('rsa.repy')
 
 
-# Set up the logger
-log_filehandler = logging.FileHandler('selexor_server.log', 'a')
-log_filehandler.setLevel(logging.DEBUG)
-log_filehandler.setFormatter(logging.Formatter("%(asctime)s %(message)s"))
-
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
-logger.addHandler(log_filehandler)
+logger = selexorhelper.setup_logging(__name__)
 
 
 # Contains information about all requests.

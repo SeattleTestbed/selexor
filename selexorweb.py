@@ -46,14 +46,7 @@ repyhelper.translate_and_import('serialize.repy')
 # Used to read the nodestate transition key
 repyhelper.translate_and_import('rsa.repy')   
 
-# Set up the logger
-log_filehandler = logging.FileHandler('web_server.log', 'a')
-log_filehandler.setLevel(logging.DEBUG)
-log_filehandler.setFormatter(logging.Formatter("%(asctime)s %(message)s"))
 
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
-logger.addHandler(log_filehandler)
 
 
 # This is a fix for slow response times for python's base http server.
@@ -70,12 +63,13 @@ context['INDEX_FILE'] = 'web_ui_template.html'
 context['WEB_PATH'] = './web/'
 
 def main():
+  global logger
   if len(sys.argv) != 2:
     print "Unexpected arguments!"
     print 'Usage: $ python selexorweb.py [instance name]'
     return
 
-  instance_name = sys.argv[1]
+  logger = selexorhelper.setup_logging("selexorweb")
 
   # Generate the index file
   _generate_request_form()

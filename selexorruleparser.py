@@ -75,16 +75,8 @@ import selexorexceptions
 from copy import deepcopy
 from collections import deque
 import time
-import logging
 
-# Set up the logger
-log_filehandler = logging.FileHandler('rule_parser.log', 'a')
-log_filehandler.setLevel(logging.DEBUG)
-log_filehandler.setFormatter(logging.Formatter("%(asctime)s %(message)s"))
 
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
-logger.addHandler(log_filehandler)
 
 rule_callbacks = {
   'group': {},
@@ -644,23 +636,9 @@ def deregister_callback(rule_name):
 
 
 def _init():
-  '''
-  <Purpose>
-    Loads all rules into the rules dictionary.
-  
-  <Arguments>
-    None
-  
-  <Exceptions>
-    None
- 
-  <Side Effects>
-    Adds new rules into the rules dictionary.
-  
-  <Return>
-    None
+  global logger
+  logger = helper.setup_logging(__name__)
 
-  '''
   register_callback('location_specific', 'vessel', _specific_location_parser, _specific_location_preprocessor)
   register_callback('location_separation_radius', 'group', _separation_radius_parser, _separation_radius_preprocessor)
   register_callback('location_different', 'group', _different_location_type_parser, _different_location_preprocessor)

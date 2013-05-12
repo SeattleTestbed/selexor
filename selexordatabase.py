@@ -50,16 +50,8 @@ import time
 import os
 import traceback
 import MySQLdb
-import logging
 
-# Set up the logger
-log_filehandler = logging.FileHandler('database.log', 'a')
-log_filehandler.setLevel(logging.DEBUG)
-log_filehandler.setFormatter(logging.Formatter("%(asctime)s %(message)s"))
 
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
-logger.addHandler(log_filehandler)
 
 
 
@@ -116,7 +108,6 @@ def probe_for_vessels():
   # Look up as many values as possible
   nodes_to_check = advertise_lookup(nodestate_transition_key, maxvals=2**32)
   logger.info("Found " +str(len(nodes_to_check))+ " nodes")
-  print "Found " +str(len(nodes_to_check))+ " nodes"
 
   update_threads = []
   for thread_no in range(settings.num_probe_threads):
@@ -344,7 +335,9 @@ def commit_data_to_database(db, cursor, nodelocation, node_dict, ports, geoinfo)
 
 
 if __name__=='__main__':
+  global logger
   global nodestate_transition_key
+  logger = selexorhelper.setup_logging('selexordatabase')
 
   nodestate_transition_key = rsa_file_to_publickey(settings.path_to_nodestate_transition_key)
 

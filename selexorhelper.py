@@ -18,9 +18,14 @@ import selexorexceptions
 import os
 import seattleclearinghouse_xmlrpc
 import MySQLdb
+import logging
 import settings
 
 helpercontext = {}
+
+initialized_loggers = {}
+logger = None
+
 
 
 def is_ipv4_address(ipstring):
@@ -84,6 +89,8 @@ def get_node_ip_port_from_nodelocation(nodelocation):
 
 
 def initialize():
+  global logger
+  logger = setup_logging(__name__)
   helpercontext['COUNTRY_TO_ID'] = load_ids('country')
   # This takes up too much memory...
   # helpercontext['CITY_TO_ID'] = load_ids('city')
