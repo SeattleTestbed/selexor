@@ -104,7 +104,7 @@ def main():
 class SelexorHTTPServer(BaseHTTPServer.HTTPServer):
   def __init__(self, address_tuple, handler_class):
     BaseHTTPServer.HTTPServer.__init__(self, address_tuple, handler_class)
-    if settings.enable_ssl:
+    if settings.enable_https:
       # Enable SSL support
       self.socket = ssl.wrap_socket(
               self.socket,
