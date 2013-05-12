@@ -215,7 +215,6 @@ class SelexorHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         self.wfile.write(data)
         data = dataFile.read(chunksize)
       dataFile.close()
-    self.wfile.close()
 
 
   def do_POST(self):
