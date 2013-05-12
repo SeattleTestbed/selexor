@@ -222,4 +222,30 @@ def connect_to_db():
   return db, cursor
 
 
+def setup_logging(loggername):
+  global initialized_loggers
+
+  # We shouldn't try to re-initialize a logger that already exists...
+  if loggername in initialized_loggers:
+    return initialized_loggers[loggername]
+
+  logger = logging.getLogger(loggername)
+  logger.setLevel(logging.DEBUG)
+
+  formatter = logging.Formatter("%(asctime)s %(message)s")
+
+  filehandler = logging.FileHandler(loggername+'.log', 'a')
+  streamhandler = logging.StreamHandler()
+
+  filehandler.setFormatter(formatter)
+  streamhandler.setFormatter(formatter)
+
+  logger.addHandler(streamhandler)
+  logger.addHandler(filehandler)
+
+  initialized_loggers[loggername] = logger
+  return logger
+
+
+
 initialize()
