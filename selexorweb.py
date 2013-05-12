@@ -34,6 +34,7 @@ import seattleclearinghouse_xmlrpc   # Needed for checking auth. exceptions
 import logging
 import traceback
 import selexorhelper
+import ssl
 import settings
 import substitutions
 # Raised when we cannot connect to the clearinghouse XMLRPC server
@@ -74,7 +75,7 @@ def main():
   # Generate the index file
   _generate_request_form()
   
-  http_server = BaseHTTPServer.HTTPServer((settings.http_ip_addr, settings.http_port), SelexorHandler)
+  http_server = SelexorHTTPServer((settings.http_ip_addr, settings.http_port), SelexorHandler)
   http_thread = threading.Thread(target=http_server.serve_forever)
   nodestate_transition_key = rsa_file_to_publickey(settings.path_to_nodestate_transition_key)
   
@@ -96,6 +97,20 @@ def main():
   print "Stopping SeleXor server..."
   selexor_server.shutdown()
   print "Shutdown Complete."
+
+
+
+
+class SelexorHTTPServer(BaseHTTPServer.HTTPServer):
+  def __init__(self, address_tuple, handler_class):
+    BaseHTTPServer.HTTPServer.__init__(self, address_tuple, handler_class)
+    if settings.enable_ssl:
+      # Enable SSL support
+      self.socket = ssl.wrap_socket(
+              self.socket,
+              certfile=settings.path_to_ssl_certificate,
+              keyfile=settings.path_to_ssl_key,
+              server_side=True)
 
 
 

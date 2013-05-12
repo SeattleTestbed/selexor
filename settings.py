@@ -13,8 +13,27 @@
 http_ip_addr = '0.0.0.0'
 
 # The port that we should listen for incoming connections.
-# Listens on the HTTP port by default.
-http_port = 80
+# Listens on the HTTPS port by default.
+http_port = 443
+
+
+"""
+HTTPS Configuration
+"""
+# If HTTPS is set, you must have M2Crypto installed.  In addition, you must have the paths
+# to the SSL certificate and keys configured correctly.
+enable_https = True
+
+# The certificate file that is used with SSL.
+# This file should be in a PEM format.  
+# This can be generated through OpenSSL for testing, but a valid certificate
+# provided by a trusted certificate provider must be used for production.
+path_to_ssl_certificate = 'server.crt'
+
+# The key file that is used with SSL.  This key must be the one that is paired
+# with the certificate provided above.
+path_to_ssl_key = 'server.key'
+
 
 
 # The number of threads to use to probe
