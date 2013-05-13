@@ -357,20 +357,18 @@ def _specific_location_parser(cursor, invert, parameters):
   # Get the nodelocations that are good.
   # The city field is optional
   if parameters['city'] is None:
-    location_query = 'country_code="'+parameters['country_code']+'"'
+    condition = 'location.country_code="'+parameters['country_code']+'"'
   else:
-    location_query = 'city="'+parameters['city']+'" AND country_code="'+parameters['country_code']+'"'
+    condition = 'location.city="'+parameters['city']+'" AND location.country_code="'+parameters['country_code']+'"'
   if invert:
-    location_query = 'NOT ' + location_query
-  cursor.execute('SELECT nodelocation from location WHERE ' + location_query)
-  
-  good_vessels = []
-  # Get the vessels on those nodelocations  
-  for nodelocationtuple in cursor.fetchall():
-    cursor.execute('SELECT nodelocation, vesselname FROM vessels WHERE NodeLocation="' + nodelocationtuple[0] +'"')
-    good_vessels += cursor.fetchall()
-  
-  return good_vessels
+    condition = 'NOT ' + condition
+
+  query = """SELECT node_id, vessel_name FROM 
+      (SELECT ip_addr FROM location WHERE """+condition+""") as valid_ips
+      LEFT JOIN nodes USING (ip_addr) LEFT JOIN valid_vessels USING (node_id)"""
+  logger.debug(query)
+  cursor.execute(query)
+  return cursor.fetchall()
 
 
 def _separation_radius_preprocessor(parameters):
@@ -459,19 +457,25 @@ def _separation_radius_parser(cursor, invert, parameters, acquired_vessels):
   
   acquired_coordinates = set()
   # Get the coordinates of the acquired vessels
-  for acquired_vessel in acquired_vessels:
+  # acquired_vessels is a list of vesseldicts
+  for vesseldict in acquired_vessels:
     # We may have NULL/NULL for the coordinate data.  
     # Make sure we don't fetch any of those entries.
     if cursor.execute('''
         SELECT longitude, latitude FROM location LEFT JOIN nodes 
-        USING (nodelocation) WHERE longitude IS NOT NULL AND latitude IS NOT NULL 
-        AND nodekey="'''+acquired_vessel.split(':')[0]+'"') == 1L:
+        USING (ip_addr) WHERE longitude IS NOT NULL AND latitude IS NOT NULL 
+        AND node_id='''+str(vesseldict['node_id'])) == 1L:
+
       acquired_coordinates.add(cursor.fetchone())
   
   # Compile the list of good nodelocations
-  good_nodelocations = []
-  cursor.execute('SELECT DISTINCT nodelocation, longitude, latitude FROM location WHERE longitude IS NOT NULL and latitude IS NOT NULL')
-  for nodelocation, longitude, latitude in cursor.fetchall():
+  # Performing this on the database is really slow... 
+  # We might as well do it here to avoid having too much pressure on the DB.
+  good_nodes = []
+  cursor.execute('''
+      SELECT DISTINCT node_id, longitude, latitude FROM location LEFT JOIN nodes
+      USING (ip_addr) WHERE longitude IS NOT NULL and latitude IS NOT NULL''')
+  for node_id, longitude, latitude in cursor.fetchall():
     good_radius = True
     for acquired_longitude, acquired_latitude in acquired_coordinates:
       distance = helper.haversine_distance(longitude, latitude, acquired_longitude, acquired_latitude)
@@ -481,14 +485,13 @@ def _separation_radius_parser(cursor, invert, parameters, acquired_vessels):
       if not good_radius:
         break
     if invert ^ good_radius:
-      good_nodelocations.append(nodelocation)
+      good_nodes.append(node_id)
       
   # Of the list of good nodelocations, compile the set of good vessels
-  good_vessels = set()
-  for nodelocation in good_nodelocations:
-    cursor.execute('SELECT vesselname FROM vessels WHERE nodelocation="'+nodelocation+'"')
-    for vessel in cursor.fetchall():
-      good_vessels.add((nodelocation, vessel))
+  good_vessels = []
+  for node_id in good_nodes:
+    cursor.execute('SELECT node_id, vessel_name FROM vessels WHERE node_id='+str(node_id))
+    good_vessels += cursor.fetchall()
   
   return good_vessels
 
@@ -511,10 +514,13 @@ def _different_location_type_parser(cursor, invert, parameters, acquired_vessels
   '''
   locations= set()
   # Compile list of locations
-  for acquired_vessel in acquired_vessels:
-    cursor.execute('SELECT (nodelocation) FROM nodes WHERE nodekey="'+acquired_vessel.split(':')[0]+'"')
-    nodelocation = cursor.fetchone()[0]
-    cursor.execute('SELECT '+parameters['location_type']+' FROM location WHERE nodelocation="'+nodelocation+'"')
+  for vesseldict in acquired_vessels:
+    nodekey = vesseldict['handle'].split(':')[0]
+    query = """
+      SELECT """+parameters['location_type']+""" FROM 
+        (SELECT ip_addr FROM nodes WHERE node_key='"""+nodekey+"""') AS node_row 
+      LEFT JOIN location USING (ip_addr)"""
+    helper.autoretry_mysql_command(cursor, query)
     locations.add(cursor.fetchone()[0])
 
   query = parameters['location_type'] + " "
@@ -532,8 +538,14 @@ def _different_location_type_parser(cursor, invert, parameters, acquired_vessels
       (invert and len(locations) == parameters['location_count'])):
     query += 'NOT '
   query += 'IN ("'+'", "'.join(locations)+'")'
-  
-  cursor.execute('SELECT nodelocation, vesselname FROM vessels LEFT JOIN location USING (nodelocation) WHERE '+query)
+  query = """
+    SELECT node_id, vessel_name FROM 
+      (SELECT node_id FROM 
+        (SELECT ip_addr FROM location WHERE city NOT IN ("""+query+""")
+        ) as matching_locations LEFT JOIN nodes using (ip_addr)
+      ) as matching_nodes LEFT JOIN vessels USING (node_id)"""
+  logger.debug(query)
+  cursor.execute(query)
     
   return cursor.fetchall()
 
