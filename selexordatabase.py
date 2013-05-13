@@ -71,34 +71,6 @@ import MySQLdb
 
 
 
-def autoretry_mysql_command(cursor, command):
-  """
-  <Purpose>
-    Inserts the specified command into the command queue, and returns its
-    result when the command is executed.  This is used to prevent deadlocks
-    that would occur due to simultaneous db accesses.
-  <Arguments>
-    command: The command to send to the database.
-  <Side Effects>
-    Executes the specified MySQL statement.
-  <Exceptions>
-    None
-  <Returns>
-    None
-  """
-  while True:
-    try:
-      result = cursor.execute(command)
-      return result
-    except MySQLdb.OperationalError, e:
-      if (e.args == (1213, 'Deadlock found when trying to get lock; try restarting transaction') or
-          e.args == (1205, 'Lock wait timeout exceeded; try restarting transaction')):
-        continue
-      raise
-
-
-
-
 def format_geoinfo(geoinfo):
   '''
   <Purpose>
@@ -202,7 +174,7 @@ def contact_vessels_and_update_database(nodes_to_check):
 
         # Only retrieve the geographic information if we don't have it already
         # The geoip server's data doesn't change, so we don't need to constantly update it.
-        geoinfo_exists = autoretry_mysql_command(cursor, "SELECT ip_addr FROM location WHERE ip_addr='"+nodeinfo['id']+"'") == 1L
+        geoinfo_exists = selexorhelper.autoretry_mysql_command(cursor, "SELECT ip_addr FROM location WHERE ip_addr='"+nodeinfo['id']+"'") == 1L
         if not geoinfo_exists:
           logger.info("Location data not in database, looking up on geoip: "+nodelocation)
           geoinfo = geoip_record_by_addr(nodeinfo['id'])
@@ -241,16 +213,16 @@ def commit_data_to_database(db, cursor, node_ip, node_port, node_dict, ports, ge
   # == Update Nodes Table ==
   nodekeystr = rsa_publickey_to_string(node_dict['nodekey'])
 
-  new_node = autoretry_mysql_command(cursor, "SELECT node_id FROM nodes WHERE node_key='"+nodekeystr+"'") == 0L
+  new_node = selexorhelper.autoretry_mysql_command(cursor, "SELECT node_id FROM nodes WHERE node_key='"+nodekeystr+"'") == 0L
 
   if new_node:
     # Node isn't recognized, add it to the db
     cmd = ("INSERT INTO nodes (node_key, ip_addr, node_port, last_ip_change, last_seen) "+
           "VALUES ('%s', '%s', %i, NOW(), NOW())") % (nodekeystr, node_ip, node_port)
-    autoretry_mysql_command(cursor, cmd)
+    selexorhelper.autoretry_mysql_command(cursor, cmd)
 
     # Now retrieve the internal node_id.
-    autoretry_mysql_command(cursor, "SELECT node_id FROM nodes WHERE node_key='"+nodekeystr+"'")
+    selexorhelper.autoretry_mysql_command(cursor, "SELECT node_id FROM nodes WHERE node_key='"+nodekeystr+"'")
     node_id = cursor.fetchone()[0]
     logger.info('\n'.join([
         "New node found: #" + str(node_id),
@@ -268,15 +240,15 @@ def commit_data_to_database(db, cursor, node_ip, node_port, node_dict, ports, ge
 
 
     # Did the IP address change?  If so mark that down.
-    autoretry_mysql_command(cursor, "SELECT (ip_addr) FROM nodes WHERE node_key='"+nodekeystr+"'")
+    selexorhelper.autoretry_mysql_command(cursor, "SELECT (ip_addr) FROM nodes WHERE node_key='"+nodekeystr+"'")
     old_node_ip = cursor.fetchone()[0]
     if node_ip != old_node_ip:
       cmd = "UPDATE nodes SET ip_addr='%s', last_ip_change=NOW() WHERE node_id=%i" % (node_ip, node_id)
-      autoretry_mysql_command(cursor, cmd)
+      selexorhelper.autoretry_mysql_command(cursor, cmd)
 
     # Update the last time we saw the node.
     cmd = "UPDATE nodes SET last_seen=NOW() WHERE node_id=%i" % (node_id)
-    autoretry_mysql_command(cursor, cmd)
+    selexorhelper.autoretry_mysql_command(cursor, cmd)
 
   # == Update Vessels Table ==
   update_vessels_table(cursor, node_id, node_dict['vessels'])
@@ -300,7 +272,7 @@ def commit_data_to_database(db, cursor, node_ip, node_port, node_dict, ports, ge
 
 def update_vessels_table(cursor, node_id, vessel_dict):
   query = 'SELECT vessel_name FROM vessels WHERE node_id='+str(node_id)
-  num_vessels = autoretry_mysql_command(cursor, query)
+  num_vessels = selexorhelper.autoretry_mysql_command(cursor, query)
   vessel_rows = cursor.fetchall()
 
   if vessel_rows:
@@ -318,7 +290,7 @@ def update_vessels_table(cursor, node_id, vessel_dict):
             ]))
 
       query = 'DELETE FROM vessels WHERE node_id='+str(node_id)+' AND vessel_name in ('+', '.join(vessels_to_remove)+')'
-      autoretry_mysql_command(cursor, query)
+      selexorhelper.autoretry_mysql_command(cursor, query)
 
   # Update the list of vessels
   logger.info('\n'.join([
@@ -337,12 +309,12 @@ def update_vessels_table(cursor, node_id, vessel_dict):
       query += " ('"+str(node_id)+"', '"+vessel_name+"'),"
     # Get rid of the trailing comma after the last tuple
     query = query.strip(',')
-    autoretry_mysql_command(cursor, query)
+    selexorhelper.autoretry_mysql_command(cursor, query)
 
 
 def update_userkeys_table(cursor, node_id, vessel_dict):
   query = 'SELECT vessel_name FROM userkeys WHERE node_id='+str(node_id)
-  num_vessels = autoretry_mysql_command(cursor, query)
+  num_vessels = selexorhelper.autoretry_mysql_command(cursor, query)
   vessel_rows = cursor.fetchall()
 
   if vessel_rows:
@@ -355,7 +327,7 @@ def update_userkeys_table(cursor, node_id, vessel_dict):
 
     if vessels_to_remove:
       query = 'DELETE FROM userkeys WHERE node_id='+str(node_id)+' AND vessel_name in ('+', '.join(vessels_to_remove)+')'
-      autoretry_mysql_command(cursor, query)
+      selexorhelper.autoretry_mysql_command(cursor, query)
 
 
   # Update the userkeys
@@ -366,7 +338,7 @@ def update_userkeys_table(cursor, node_id, vessel_dict):
 
 
     query = 'SELECT userkey FROM userkeys WHERE node_id='+str(node_id)+" AND vessel_name='"+vessel_name+"'"
-    autoretry_mysql_command(cursor, query)
+    selexorhelper.autoretry_mysql_command(cursor, query)
     userkey_rows = cursor.fetchall()
 
     userkeys_to_remove = []
@@ -378,7 +350,7 @@ def update_userkeys_table(cursor, node_id, vessel_dict):
 
     if userkeys_to_remove:
       query = 'DELETE FROM userkeys WHERE (node_id, vessel_name)=('+str(node_id)+', "'+vessel_name+'") AND userkey in ('+', '.join(userkeys_to_remove)+')'
-      autoretry_mysql_command(cursor, query)
+      selexorhelper.autoretry_mysql_command(cursor, query)
 
 
     # Vessels may not have userkeys on them.  Don't bother adding them in that case.
@@ -389,13 +361,13 @@ def update_userkeys_table(cursor, node_id, vessel_dict):
         query += " ('"+str(node_id)+"', '"+vessel_name+"', '"+rsa_publickey_to_string(userkey)+"'),"
       # Get rid of the trailing comma after the last tuple
       query = query.strip(',')
-      autoretry_mysql_command(cursor, query)
+      selexorhelper.autoretry_mysql_command(cursor, query)
 
 
 
 def update_ports_table(cursor, node_id, ports):
   query = 'SELECT vessel_name FROM vesselports WHERE node_id='+str(node_id)
-  num_vessels = autoretry_mysql_command(cursor, query)
+  num_vessels = selexorhelper.autoretry_mysql_command(cursor, query)
   vessel_rows = cursor.fetchall()
 
   if vessel_rows:
@@ -408,7 +380,7 @@ def update_ports_table(cursor, node_id, ports):
 
     if vessels_to_remove:
       query = 'DELETE FROM vesselports WHERE node_id='+str(node_id)+' AND vessel_name in ('+', '.join(vessels_to_remove)+')'
-      autoretry_mysql_command(cursor, query)
+      selexorhelper.autoretry_mysql_command(cursor, query)
 
 
   # Update the ports
@@ -418,7 +390,7 @@ def update_ports_table(cursor, node_id, ports):
       continue
 
     query = 'SELECT port FROM vesselports WHERE node_id='+str(node_id)+" AND vessel_name='"+vessel_name+"'"
-    autoretry_mysql_command(cursor, query)
+    selexorhelper.autoretry_mysql_command(cursor, query)
     ports_rows = cursor.fetchall()
 
     ports_to_remove = []
@@ -430,7 +402,7 @@ def update_ports_table(cursor, node_id, ports):
 
     if ports_to_remove:
       query = 'DELETE FROM vesselports WHERE (node_id, vessel_name)=('+str(node_id)+', "'+vessel_name+'" AND port in ('+', '.join(ports_to_remove)+')'
-      autoretry_mysql_command(cursor, query)
+      selexorhelper.autoretry_mysql_command(cursor, query)
 
 
     # Vessels may not have ports on them.  Don't bother adding them in that case.
@@ -441,7 +413,7 @@ def update_ports_table(cursor, node_id, ports):
         query += " ('"+str(node_id)+"', '"+vessel_name+"', "+str(port)+"),"
       # Get rid of the trailing comma after the last tuple
       query = query.strip(',')
-      autoretry_mysql_command(cursor, query)
+      selexorhelper.autoretry_mysql_command(cursor, query)
 
 
 
@@ -465,7 +437,7 @@ def update_location_table(cursor, ip_addr, geoinfo):
   # Specifies the location tuple for the update clause
   query += "city='%s', country_code='%s', longitude=%s, latitude=%s" % (city, country_code, longitude, latitude)
 
-  autoretry_mysql_command(cursor, query)
+  selexorhelper.autoretry_mysql_command(cursor, query)
 
 
 

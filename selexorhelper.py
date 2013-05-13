@@ -222,6 +222,40 @@ def connect_to_db():
   return db, cursor
 
 
+
+
+
+def autoretry_mysql_command(cursor, command):
+  """
+  <Purpose>
+    Inserts the specified command into the command queue, and returns its
+    result when the command is executed.  This is used to prevent deadlocks
+    that would occur due to simultaneous db accesses.
+  <Arguments>
+    command: The command to send to the database.
+  <Side Effects>
+    Executes the specified MySQL statement.
+  <Exceptions>
+    None
+  <Returns>
+    None
+  """
+  while True:
+    try:
+      result = cursor.execute(command)
+      return result
+    except MySQLdb.OperationalError, e:
+      if (e.args == (1213, 'Deadlock found when trying to get lock; try restarting transaction') or
+          e.args == (1205, 'Lock wait timeout exceeded; try restarting transaction')):
+        continue
+      raise
+
+
+
+
+
+
+
 def setup_logging(loggername):
   global initialized_loggers
 
