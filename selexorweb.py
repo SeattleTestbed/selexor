@@ -134,7 +134,7 @@ def _generate_request_form():
   '''
 
   # This is the source file to parse
-  srcfile = open(os.path.normpath(WEB_PATH + TEMPLATE_FN), 'r')
+  srcfile = open(os.path.normpath(WEB_PATH + TEMPLATE_INDEX_FN), 'r')
   # This is the file that will contain the outputted data.
   destfile = open(os.path.normpath(WEB_PATH + INDEX_FN), 'w')
 

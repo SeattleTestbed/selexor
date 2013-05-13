@@ -113,7 +113,7 @@ def probe_for_vessels():
   for thread_no in range(settings.num_probe_threads):
     thread = threading.Thread(
         target = contact_vessels_and_update_database,
-        args=(configuration, nodes_to_check))
+        args=(nodes_to_check,))
     # Allow threads to be terminated by a CTRL+C
     thread.daemon = True
     update_threads.append(thread)
