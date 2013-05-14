@@ -293,7 +293,41 @@ var init = function() {
 
   update_remaining_host_count();
 
+  if (location.hash) {
+    extract_login_info_from_url_hash()
+    authenticate()
+  }
+
 };
+
+
+/*
+<Purpose>
+  Extracts user credentials from the browser's URL hash.
+<Arguments>
+  None
+<Side Effects>
+  Fills the username and API key fields with values provided 
+  in the URL hash.
+<Exceptions>
+  None
+<Returns>
+  None
+
+*/
+var extract_login_info_from_url_hash = function() {
+  var inputs = location.hash.substring(1).split('&')
+  var authinfo = {}
+  for (var i in inputs) {
+    var key = inputs[i].split('=')[0]
+    var value = inputs[i].split('=')[1]
+    authinfo[key] = value
+  }
+  if ('username' in authinfo && 'apikey' in authinfo) {
+    $('#username_text').val(authinfo['username'])
+    $('#apikey_text').val(authinfo['apikey'])
+  }
+}
 
 
 /*
@@ -621,6 +655,7 @@ function convert_rules_to_string() {
   Disables authentication fields on successful authentication.
   Updates g_max_hosts and g_num_hosts_remaining.
   Resets hosts to allocate for all groups to 0.
+  Changes the URL hash to reflect the current active session on successful login.
 <Exceptions>
   None
 <Returns>
@@ -669,6 +704,9 @@ function authenticate() {
           $('#username_text, #apikey_text').attr('disabled', 1)
         }
         g_authenticated = true
+
+        // Update the URL hash so that the user can easily login after this
+        location.hash = '#username='+$('#username_text').val()+'&apikey='+$('#apikey_text').val()
       }
     }
   }).fail(function(data, textStatus, jqXhr) {
