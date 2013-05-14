@@ -115,16 +115,19 @@ def rules_from_strings(strings):
 
 
 def preprocess_rules(rules):
-  for rule_name, rule_params in rules.iteritems():
-    # Only preprocess if preprocessor is available
-    if parameter_preprocess_callbacks[rule_name]:
-      replacement_params = parameter_preprocess_callbacks[rule_name](rule_params)
-      if replacement_params is None:
-        logger.error("Rule does not return parameters: " + rule_name)
-      else:
-        rule_params = replacement_params
-    rules[rule_name] = rule_params
-  return rules
+  try:
+    for rule_name, rule_params in rules.iteritems():
+      # Only preprocess if preprocessor is available
+      if parameter_preprocess_callbacks[rule_name]:
+        replacement_params = parameter_preprocess_callbacks[rule_name](rule_params)
+        if replacement_params is None:
+          logger.error("Rule does not return parameters: " + rule_name)
+        else:
+          rule_params = replacement_params
+      rules[rule_name] = rule_params
+    return rules
+  except KeyError, e:
+    raise selexorexceptions.UnknownRule(str(e) + ' is not a recognized rule')
 
 def has_group_rules(rules):
   '''
@@ -360,7 +363,7 @@ def _specific_location_parser(cursor, invert, parameters):
   if invert:
     condition = 'NOT ' + condition
 
-  query = """SELECT node_id, vessel_name FROM
+  query = """SELECT node_id, vessel_name FROM 
       (SELECT ip_addr FROM location WHERE """+condition+""") as valid_ips
       LEFT JOIN nodes USING (ip_addr) LEFT JOIN valid_vessels USING (node_id)"""
   logger.debug(query)
@@ -652,6 +655,7 @@ def _init():
   register_callback('location_separation_radius', 'group', _separation_radius_parser, _separation_radius_preprocessor)
   register_callback('location_different', 'group', _different_location_type_parser, _different_location_preprocessor)
   register_callback('num_ip_change', 'vessel', _ip_change_count_parser, _ip_change_count_preprocessor)
+  register_callback('port', 'vessel', _port_parser, _port_preprocessor)
 
 
 
