@@ -38,14 +38,14 @@ import ssl
 import settings
 import substitutions
 # Raised when we cannot connect to the clearinghouse XMLRPC server
-from xmlrpclib import ProtocolError
-from time import sleep
+import xmlrpclib
+import time
 
 import repyhelper
 # Used for serializing objects to comm. with clients
 repyhelper.translate_and_import('serialize.repy')
 # Used to read the nodestate transition key
-repyhelper.translate_and_import('rsa.repy')   
+repyhelper.translate_and_import('rsa.repy')
 
 
 
@@ -64,6 +64,8 @@ INDEX_FN = 'index.html'
 WEB_PATH = './web/'
 
 
+
+
 def main():
   global logger
   # Needed so that the event handler for the HTTP server can see the selexor server
@@ -77,13 +79,13 @@ def main():
 
   # Generate the index file
   _generate_request_form()
-  
+
   http_server = SelexorHTTPServer((settings.http_ip_addr, settings.http_port), SelexorHandler)
   http_thread = threading.Thread(target=http_server.serve_forever)
   nodestate_transition_key = rsa_file_to_publickey(settings.path_to_nodestate_transition_key)
-  
+
   selexor_server = selexorserver.SelexorServer()
-  
+
 
   http_thread.start()
   print "Listening for connections on", settings.http_ip_addr + ':' + str(settings.http_port)
@@ -91,7 +93,7 @@ def main():
   # Run indefinitely until CTRL+C is pressed.
   try:
     while True:
-      sleep(1.0)
+      time.sleep(1.0)
   except KeyboardInterrupt, e:
     pass
 
@@ -147,9 +149,9 @@ def _generate_request_form():
       before, remainder = data.split('{{', 1)
       token, remainder = remainder.split('}}', 1)
       token = token.strip()
-      
+
       # We have no way of determining ahead of time which substitutions will
-      # be defined without having to list them here...  If it isn't defined, 
+      # be defined without having to list them here...  If it isn't defined,
       # then let's just allow the exception to terminate the program.
       replacement = getattr(substitutions, token)
       result = before + replacement
@@ -190,7 +192,7 @@ class SelexorHandler(BaseHTTPServer.BaseHTTPRequestHandler):
       # Requesting index
       filepath = INDEX_FN
     filepath = WEB_PATH + filepath
-    
+
     # Write the header
     dataFile = None
     try:
@@ -206,7 +208,7 @@ class SelexorHandler(BaseHTTPServer.BaseHTTPRequestHandler):
       self.send_response(404)
     finally:
       self.end_headers()
-    
+
     # Writing to self.wfile MUST occur after ending the headers.
     if dataFile:
       # Put the file's contents to the write buffer
@@ -234,12 +236,12 @@ class SelexorHandler(BaseHTTPServer.BaseHTTPRequestHandler):
       None
     '''
     # The handlers should take the following parameters:
-    # data: The data expected by the handler. 
-    # remoteip: The IP address of the remote machine. 
-    # 
+    # data: The data expected by the handler.
+    # remoteip: The IP address of the remote machine.
+    #
     # Whatever that is returned by the handler will be put into the 'data'
-    # key of the response dictionary. 
-    
+    # key of the response dictionary.
+
     self.action_handlers = {
       'check_available': self._check_available_vessels,
       'request': self._handle_host_request,
@@ -281,17 +283,17 @@ class SelexorHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     '''
     Connects to the clearinghouse and returns a response_dict containing
     the following keys:
-      'status': 
+      'status':
         'ok' on success /'error' on failure
-      'max_hosts': 
-        The remaining number of hosts that the user can acquire. 
+      'max_hosts':
+        The remaining number of hosts that the user can acquire.
         On failure, this is '?'.
-      'default_port': 
+      'default_port':
         The user's assigned userport.
       'error':
-        A description of the error that occurred. This only exists if an error 
+        A description of the error that occurred. This only exists if an error
         happened.
-      
+
     '''
     response_dict = {}
     try:
@@ -307,7 +309,7 @@ class SelexorHandler(BaseHTTPServer.BaseHTTPRequestHandler):
       response_dict['status'] = 'error'
       response_dict['error'] = str(e)
       response_dict['max_hosts'] = "?"
-    except ProtocolError, e:
+    except xmlrpclib.ProtocolError, e:
       response_dict['status'] = 'error'
       response_dict['error'] = "SeleXor could not connect to the clearinghouse's XMLRPC server at this moment.  Please try again later."
       response_dict['max_hosts'] = "?"

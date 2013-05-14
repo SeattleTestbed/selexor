@@ -61,7 +61,6 @@ import settings
 import sys
 import threading
 import time
-import os
 import traceback
 import MySQLdb
 
@@ -210,6 +209,7 @@ def contact_vessels_and_update_database(nodes_to_check):
 def commit_data_to_database(db, cursor, node_ip, node_port, node_dict, ports, geoinfo):
   # Just in case we attempted to make any changes in a previous run and failed
   db.rollback()
+
   # == Update Nodes Table ==
   nodekeystr = rsa_publickey_to_string(node_dict['nodekey'])
 
@@ -252,7 +252,7 @@ def commit_data_to_database(db, cursor, node_ip, node_port, node_dict, ports, ge
 
   # == Update Vessels Table ==
   update_vessels_table(cursor, node_id, node_dict['vessels'])
-  
+
   # == Update Userkeys ==
   update_userkeys_table(cursor, node_id, node_dict['vessels'])
 

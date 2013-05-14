@@ -8,7 +8,7 @@
 
 """
 
-# The IP address to listen on.  
+# The IP address to listen on.
 # Use 0.0.0.0 to listen on all interfaces.
 http_ip_addr = '0.0.0.0'
 
@@ -25,7 +25,7 @@ HTTPS Configuration
 enable_https = True
 
 # The certificate file that is used with SSL.
-# This file should be in a PEM format.  
+# This file should be in a PEM format.
 # This can be generated through OpenSSL for testing, but a valid certificate
 # provided by a trusted certificate provider must be used for production.
 path_to_ssl_certificate = 'server.crt'
@@ -43,7 +43,7 @@ num_probe_threads = 4
 # The path to the file that contains the nodestate transition key.
 # The key specified must be the nodestate transition key for the same
 # clearinghouse specified at clearinghouse_xmlrpc_url.
-# Example: 
+# Example:
 # path_to_nodestate_transition_key = '/home/selexor/public/seattle_nodestatetransition.key'
 path_to_nodestate_transition_key = "seattle_nodestatetransition.key"
 
@@ -57,7 +57,7 @@ clearinghouse_xmlrpc_url = None
 # geoip_server_url = http://geoip.cs.washington.edu:12679
 geoip_server_url = None
 
-# Sets the use of SSL in insecure mode. 
+# Sets the use of SSL in insecure mode.
 allow_ssl_insecure = False
 
 # The time to wait after a probe before probing again, in seconds.
@@ -68,7 +68,7 @@ probe_delay = 10 * 60
 """
 Database Configurations
 
-This section defines which database and what users selexor is allowed to 
+This section defines which database and what users selexor is allowed to
 connect as.
 """
 
@@ -76,7 +76,7 @@ connect as.
 # Make sure to set it to the database that you created for selexor.
 dbname = 'selexordb'
 
-# dbuser is the account that will be used for creating the initial tables 
+# dbuser is the account that will be used for creating the initial tables
 # on the database, as well   This account has all privileges.
 dbusername = 'selexor'
 

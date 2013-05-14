@@ -154,7 +154,7 @@ def connect_to_clearinghouse(authdata):
 
   if not (apikey or private_key_string):
     raise selexorexceptions.SelexorAuthenticationFailed("Either apikey or privatekey must be given!")
-  
+
   logger.info("Connecting to the clearinghouse on behalf of "+username)
   client = seattleclearinghouse_xmlrpc.SeattleClearinghouseClient(
     username = username,
@@ -202,7 +202,7 @@ def get_handle_location(handle, loctype, database):
 def connect_to_db():
   """
   <Purpose>
-    Connect to the MySQL database using the user/pass/db specified in the 
+    Connect to the MySQL database using the user/pass/db specified in the
     configuration file.
   <Arguments>
     configuration - Configuration dictionary from load_config_with_file().
@@ -213,10 +213,10 @@ def connect_to_db():
   <Return>
     A db and cursor object representing the connection.
   """
-  
+
   db = MySQLdb.connect(
-      host='localhost', port=3306, 
-      user=settings.dbusername, passwd=settings.dbpassword, 
+      host='localhost', port=3306,
+      user=settings.dbusername, passwd=settings.dbpassword,
       db=settings.dbname)
   cursor = db.cursor()
   return db, cursor

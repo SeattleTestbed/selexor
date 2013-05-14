@@ -36,8 +36,8 @@ ruledict:
       If set to true, invert the rule.
     parameters: (dictionary)
       A dictionary of parameters that the rule expects.
-  The callback function should also return the list of (nodelocation, vesselname) 
-  that pass the rule.  It should be in the same format as returned by a MySQL 
+  The callback function should also return the list of (nodelocation, vesselname)
+  that pass the rule.  It should be in the same format as returned by a MySQL
   lookup.
 
   After defining the callback function, simply place it into the corresponding
@@ -69,12 +69,9 @@ ruledict:
 
 
 """
-import selexorhelper as helper
-import random
+import selexorhelper
 import selexorexceptions
 from copy import deepcopy
-from collections import deque
-import time
 
 
 
@@ -106,14 +103,14 @@ def rules_from_strings(strings):
     # They are always in pairs
     parameters = string.split(",")
     rule_name = parameters[0]
-    
+
     if rule_name in rules:
       raise selexorexceptions.SelexorInvalidRequest("A rule was specified multiple times!")
     parameters = parameters[1:]
     for parameter in parameters:
       (param_type, param_value) = parameter.split('~')
       rule_params[param_type] = param_value
-    
+
   return rules
 
 
@@ -284,8 +281,8 @@ def _specific_location_preprocessor(parameters):
     if parameters['city'] == '?':
       retdict['city'] = None
     else:
-      retdict['city'] = helper.get_city_id(parameters['city'])
-    retdict['country_code'] = helper.get_country_id(parameters['country'])
+      retdict['city'] = selexorhelper.get_city_id(parameters['city'])
+    retdict['country_code'] = selexorhelper.get_country_id(parameters['country'])
   except selexorexceptions.UnknownLocation, e:
     raise selexorexceptions.BadParameter(str(e))
 
@@ -363,7 +360,7 @@ def _specific_location_parser(cursor, invert, parameters):
   if invert:
     condition = 'NOT ' + condition
 
-  query = """SELECT node_id, vessel_name FROM 
+  query = """SELECT node_id, vessel_name FROM
       (SELECT ip_addr FROM location WHERE """+condition+""") as valid_ips
       LEFT JOIN nodes USING (ip_addr) LEFT JOIN valid_vessels USING (node_id)"""
   logger.debug(query)
@@ -454,22 +451,22 @@ def _separation_radius_parser(cursor, invert, parameters, acquired_vessels):
         Expected Range: [0, Infinity)
 
   '''
-  
+
   acquired_coordinates = set()
   # Get the coordinates of the acquired vessels
   # acquired_vessels is a list of vesseldicts
   for vesseldict in acquired_vessels:
-    # We may have NULL/NULL for the coordinate data.  
+    # We may have NULL/NULL for the coordinate data.
     # Make sure we don't fetch any of those entries.
     if cursor.execute('''
-        SELECT longitude, latitude FROM location LEFT JOIN nodes 
-        USING (ip_addr) WHERE longitude IS NOT NULL AND latitude IS NOT NULL 
+        SELECT longitude, latitude FROM location LEFT JOIN nodes
+        USING (ip_addr) WHERE longitude IS NOT NULL AND latitude IS NOT NULL
         AND node_id='''+str(vesseldict['node_id'])) == 1L:
 
       acquired_coordinates.add(cursor.fetchone())
-  
+
   # Compile the list of good nodelocations
-  # Performing this on the database is really slow... 
+  # Performing this on the database is really slow...
   # We might as well do it here to avoid having too much pressure on the DB.
   good_nodes = []
   cursor.execute('''
@@ -478,7 +475,7 @@ def _separation_radius_parser(cursor, invert, parameters, acquired_vessels):
   for node_id, longitude, latitude in cursor.fetchall():
     good_radius = True
     for acquired_longitude, acquired_latitude in acquired_coordinates:
-      distance = helper.haversine_distance(longitude, latitude, acquired_longitude, acquired_latitude)
+      distance = selexorhelper.haversine_distance(longitude, latitude, acquired_longitude, acquired_latitude)
       good_radius = distance >= parameters['min_radius'] and \
                     distance <= parameters['max_radius']
       # If distance to one is incorrect, then we don't need to check the rest
@@ -486,13 +483,13 @@ def _separation_radius_parser(cursor, invert, parameters, acquired_vessels):
         break
     if invert ^ good_radius:
       good_nodes.append(node_id)
-      
+
   # Of the list of good nodelocations, compile the set of good vessels
   good_vessels = []
   for node_id in good_nodes:
     cursor.execute('SELECT node_id, vessel_name FROM vessels WHERE node_id='+str(node_id))
     good_vessels += cursor.fetchall()
-  
+
   return good_vessels
 
 
@@ -517,36 +514,36 @@ def _different_location_type_parser(cursor, invert, parameters, acquired_vessels
   for vesseldict in acquired_vessels:
     nodekey = vesseldict['handle'].split(':')[0]
     query = """
-      SELECT """+parameters['location_type']+""" FROM 
-        (SELECT ip_addr FROM nodes WHERE node_key='"""+nodekey+"""') AS node_row 
+      SELECT """+parameters['location_type']+""" FROM
+        (SELECT ip_addr FROM nodes WHERE node_key='"""+nodekey+"""') AS node_row
       LEFT JOIN location USING (ip_addr)"""
-    helper.autoretry_mysql_command(cursor, query)
+    selexorhelper.autoretry_mysql_command(cursor, query)
     locations.add(cursor.fetchone()[0])
 
   query = parameters['location_type'] + " "
-  
-  # If we have enough locations, we want vessels to only be from the 
+
+  # If we have enough locations, we want vessels to only be from the
   # already acquired locations.
   # If we don't have enough locations, we want vesels to not be from
   # the already acquired locations.
-  
+
   # Truth table:
   #                        |  Invert  | Dont invert
-  # Not enough locations   |    IN    |   NOT IN              
+  # Not enough locations   |    IN    |   NOT IN
   # Enough Locations       |  NOT IN  |     IN
-  if ((not invert and len(locations) < parameters['location_count']) or 
+  if ((not invert and len(locations) < parameters['location_count']) or
       (invert and len(locations) == parameters['location_count'])):
     query += 'NOT '
   query += 'IN ("'+'", "'.join(locations)+'")'
   query = """
-    SELECT node_id, vessel_name FROM 
-      (SELECT node_id FROM 
+    SELECT node_id, vessel_name FROM
+      (SELECT node_id FROM
         (SELECT ip_addr FROM location WHERE city NOT IN ("""+query+""")
         ) as matching_locations LEFT JOIN nodes using (ip_addr)
       ) as matching_nodes LEFT JOIN vessels USING (node_id)"""
   logger.debug(query)
   cursor.execute(query)
-    
+
   return cursor.fetchall()
 
 
@@ -578,7 +575,7 @@ def register_callback(rule_name, rule_type, acquire_callback, parameter_preproce
   '''
   <Purpose>
     Registers the callback in the rule parser.
-  
+
   <Arguments>
     rule_name: The name of the rule.
     rule_type: The type of rule.
@@ -589,17 +586,17 @@ def register_callback(rule_name, rule_type, acquire_callback, parameter_preproce
         optionally preprocess the parameter values if needed.
         Unless your rule only operates on strings, you will need to preprocess
         parameters.
-  
+
   <Side Effects>
     Rules with the specified rule name will now use the specified callbacks.
-  
+
   <Exceptions>
     InvalidRuleType
     InvalidRuleReregistration
-    
+
   <Returns>
     None
-    
+
   '''
   if rule_type not in rule_callbacks:
     raise selexorexceptions.SelexorInvalidOperation("Bad rule type: " + rule_type)
@@ -616,7 +613,7 @@ def deregister_callback(rule_name):
   '''
   <Purpose>
     Registers the callback in the rule parser.
-  
+
   <Arguments>
     rule_name: The name of the rule.
     rule_type: The type of rule.
@@ -627,17 +624,17 @@ def deregister_callback(rule_name):
         optionally preprocess the parameter values if needed.
         Unless your rule only operates on strings, you will need to preprocess
         parameters.
-  
+
   <Side Effects>
     Rules with the specified rule name will now use the specified callbacks.
-  
+
   <Exceptions>
     InvalidRuleType
     InvalidRuleReregistration
-    
+
   <Returns>
     None
-    
+
   '''
   for ruleset in rule_callbacks.values():
     if rule_name in ruleset:
@@ -649,7 +646,7 @@ def deregister_callback(rule_name):
 
 def _init():
   global logger
-  logger = helper.setup_logging(__name__)
+  logger = selexorhelper.setup_logging(__name__)
 
   register_callback('location_specific', 'vessel', _specific_location_parser, _specific_location_preprocessor)
   register_callback('location_separation_radius', 'group', _separation_radius_parser, _separation_radius_preprocessor)

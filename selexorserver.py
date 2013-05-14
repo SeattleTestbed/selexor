@@ -69,15 +69,11 @@
 
 """
 
-import sys
-import seattleclearinghouse_xmlrpc as xmlrpc_client
-import time
+import seattleclearinghouse_xmlrpc
 import copy
-import selexorruleparser as parser
+import selexorruleparser
 import selexorhelper
 import random
-import cPickle
-import os
 import fastnmclient
 import threading
 import traceback
@@ -191,9 +187,9 @@ class SelexorServer:
       authdata:
         An authdict. See module documentation for more information.
       vessels:
-        A list of dictionaries containing vessel information of the vessels 
+        A list of dictionaries containing vessel information of the vessels
         to release.  These dictionaries should either contain the vessel handle,
-        or node_ip:node_port:vesselname. 
+        or node_ip:node_port:vesselname.
       remoteip:
         The remote IP address of the client. This is used for client identification.
     <Exceptions>
@@ -241,7 +237,7 @@ class SelexorServer:
               logger.info("Failed to look up vessel "+vessel_location+' through nodemanager: '+ str(e))
 
       client = selexorhelper.connect_to_clearinghouse(authdata)
-      
+
       # Release the remaining vessels
       for vessel in handles_of_vessels_to_release:
         # Do we need to check if a vessel failed to release?
@@ -285,7 +281,7 @@ class SelexorServer:
     db, cursor = selexorhelper.connect_to_db()
 
     cursor = db.cursor()
-        
+
     data = {'groups':{}}
     try:
       username = authinfo.keys()[0]
@@ -303,19 +299,19 @@ class SelexorServer:
         group_data['status'] = group['status']
         if 'error' in group:
           group_data['error'] = group['error']
-          
+
         group_data['vessels_acquired'] = []
         for vesseldict in group['acquired']:
           vesselhandle = vesseldict['handle']
           nodeinfo = {}
-          
+
           nodekey, nodeinfo['vesselname'] = vesselhandle.split(':')
           cursor.execute('SELECT ip_addr, node_port FROM nodes WHERE node_key="'+nodekey+'"')
           nodeinfo['node_ip'], nodeinfo['node_port'] = cursor.fetchone()
           nodeinfo['handle'] = vesselhandle
-          
+
           group_data['vessels_acquired'].append(nodeinfo)
-          
+
         group_data['target_num_vessels'] = group['allocate']
     except Exception, e:
       logger.error(str(identity) + ": Error while responding to status query\n" + traceback.format_exc())
@@ -324,7 +320,7 @@ class SelexorServer:
 
 
   def resolve_node(self, identity, client, node, port, db, cursor):
-    
+
     # We should never run into these...
     if node['status'] == "resolved":
       logger.error(str(identity) + ": Group already resolved: " + str(node))
@@ -338,16 +334,16 @@ class SelexorServer:
     remaining = node['allocate'] - len(node['acquired'])
 
     selexorhelper.autoretry_mysql_command(cursor, "CREATE TEMPORARY TABLE IF NOT EXISTS valid_vessels AS (SELECT node_id, vessel_name FROM vessels)")
-    if port: 
+    if port:
       selexorhelper.autoretry_mysql_command(cursor, """
         DELETE FROM valid_vessels WHERE (node_id, vessel_name) NOT IN
         (SELECT node_id, vessel_name FROM vesselports WHERE port="""+str(port)+")")
 
     selexorhelper.autoretry_mysql_command(cursor, "SELECT node_id, vessel_name FROM valid_vessels")
     handles_portmatch = cursor.fetchall()
-    
+
     # Get vessels that match the vessel rules
-    handles_vesselrulematch = parser.apply_vessel_rules(node['rules'], cursor, handles_portmatch)
+    handles_vesselrulematch = selexorruleparser.apply_vessel_rules(node['rules'], cursor, handles_portmatch)
     logger.info(str(identity) + ": Vessel-level matches: " + str(len(handles_vesselrulematch)))
 
     # The number of times we tried to resolve this group in the current attempt
@@ -366,7 +362,7 @@ class SelexorServer:
       if node['pass'] >= MAX_PASSES_PER_NODE:
         raise selexorexceptions.SelexorInternalError("Performing more passes than max pass!")
 
-      handles_grouprulematch = parser.apply_group_rules(
+      handles_grouprulematch = selexorruleparser.apply_group_rules(
           cursor = cursor,
           acquired_vessels = candidate_vessels,
           rules = node['rules'],
@@ -380,7 +376,7 @@ class SelexorServer:
         # programming a special case.
         node_id, vesselname = random.choice(vessellist)
         vessellist.remove((node_id, vesselname))
-        
+
         selexorhelper.autoretry_mysql_command(cursor, 'SELECT node_key FROM nodes WHERE node_id='+str(node_id))
         nodekey = cursor.fetchone()[0]
         handle = nodekey + ':' + vesselname
@@ -394,7 +390,7 @@ class SelexorServer:
           'vessel_name': vesselname,
         }
         candidate_vessels.append(vessel_dict)
-        
+
       # We ran out of vessels to check
       else:
         logger.info(str(identity) + ": Can't find any suitable vessels!")
@@ -407,14 +403,14 @@ class SelexorServer:
         # We retry if there could be another combination that MIGHT satisfy
         # the group rules. If there are no group rules, there is no point
         # to retry.
-        if not parser.has_group_rules(node['rules']):
+        if not selexorruleparser.has_group_rules(node['rules']):
           logger.info(str(identity) + ": There are no group rules applied; no point in retrying.")
           break
 
         if candidate_vessels:
           # Get the vessel that causes the largest drop in the
           # size of the available vessel pool
-          worst_vessel = parser.get_worst_vessel(
+          worst_vessel = selexorruleparser.get_worst_vessel(
               candidate_vessels,
               handles_grouprulematch,
               cursor,
@@ -434,10 +430,10 @@ class SelexorServer:
         acquired_vesseldicts = client.acquire_specific_vessels(vessels_to_acquire)
         logger.info(str(identity)+": Requested "+str(len(vessels_to_acquire))+" vessels, acquired "+str(len(acquired_vesseldicts))+":\n"+str(acquired_vesseldicts))
         node['acquired'] = candidate_vessels
-      except xmlrpc_client.NotEnoughCreditsError, e:
+      except seattleclearinghouse_xmlrpc.NotEnoughCreditsError, e:
         logger.error(str(identity) + ": Not enough vessel credits")
         raise
-      except xmlrpc_client.InvalidRequestError, e:
+      except seattleclearinghouse_xmlrpc.InvalidRequestError, e:
         logger.error(str(identity) + ": " + str(e))
         raise
       except Exception, e:
@@ -581,7 +577,7 @@ class SelexorServer:
     logger.info(str(identity) + ": Request data:\n" + str(request_data))
     incomplete_groups = copy.copy(request_data['groups'])
     next_groupname = _get_next_group_to_resolve(request_data)
-    
+
     db, cursor = selexorhelper.connect_to_db()
 
     # Start processing loop
@@ -594,7 +590,7 @@ class SelexorServer:
       try:
         logger.info(str(identity) + ": Resolving group: " + str(group))
         group = self.resolve_node(identity, client, group, port, db, cursor)
-      except xmlrpc_client.NotEnoughCreditsError, e:
+      except seattleclearinghouse_xmlrpc.NotEnoughCreditsError, e:
         group['status'] = 'error'
         group['error'] = str(e)
         logger.info(str(identity) + ": Not enough credits.")
@@ -655,9 +651,9 @@ class SelexorServer:
           }
 
       try:
-        new_group['rules'] = parser.preprocess_rules(groupdata['rules'])
+        new_group['rules'] = selexorruleparser.preprocess_rules(groupdata['rules'])
       except Exception, e:
-        new_group['error'] = str(e)        
+        new_group['error'] = str(e)
         logger.info(str(identity) + ": Error while parsing rulestring for group " + groupid + '\n' + traceback.format_exc())
         has_errors = True
       except:
@@ -693,17 +689,17 @@ def get_handle_from_nodehandle(nodehandle):
   '''
   <Purpose>
     Given a node handle (e.g. 192.168.1.1:1224:v8), figure out its vesselhandle.
-    
+
   <Parameters>
     nodehandle:
       A string representing a vessel, in the format 'node_id:port:vesselname'
-      
+
   <Exceptions>
     NMClientException
-    
+
   <Side Effects>
     Connect to the given node handle.
-    
+
   <Return>
     The vesselhandle that corresponds with the node handle.
 
@@ -712,7 +708,6 @@ def get_handle_from_nodehandle(nodehandle):
   port = int(port)
   nmhandle = fastnmclient.nmclient_createhandle(nodeid, port)
   try:
-##    handleinfo = fastnmclient.nmclient_get_handle_info(nmhandle)
     vesseldict = fastnmclient.nmclient_getvesseldict(nmhandle)
   finally:
     fastnmclient.nmclient_destroyhandle(nmhandle)
