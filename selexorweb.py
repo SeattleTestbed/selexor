@@ -25,6 +25,7 @@
 """
 
 import BaseHTTPServer
+import SocketServer
 import selexorserver
 import selexorexceptions
 import os
@@ -41,12 +42,16 @@ import substitutions
 import xmlrpclib
 import time
 
+# We need to translate first, then import separately
+# This is so that they do not overwrite python's open()
 import repyhelper
 # Used for serializing objects to comm. with clients
-repyhelper.translate_and_import('serialize.repy')
+repyhelper.translate('serialize.repy')
 # Used to read the nodestate transition key
-repyhelper.translate_and_import('rsa.repy')
+repyhelper.translate('rsa.repy')
 
+import serialize_repy
+import rsa_repy
 
 
 
@@ -82,7 +87,7 @@ def main():
 
   http_server = SelexorHTTPServer((settings.http_ip_addr, settings.http_port), SelexorHandler)
   http_thread = threading.Thread(target=http_server.serve_forever)
-  nodestate_transition_key = rsa_file_to_publickey(settings.path_to_nodestate_transition_key)
+  nodestate_transition_key = rsa_repy.rsa_file_to_publickey(settings.path_to_nodestate_transition_key)
 
   selexor_server = selexorserver.SelexorServer()
 
@@ -106,7 +111,14 @@ def main():
 
 
 
-class SelexorHTTPServer(BaseHTTPServer.HTTPServer):
+# Browsers now perform pre-connections.  This means that they will spawn multiple connections
+# to the web server in order for pages to load faster.  This is bad for us because the 
+# HTTP server is single-threaded by default.  If we happen to handle one of the preconnect connections
+# and don't receive any data from it (browser is sending request information on another connection)
+# we end up blocking until the preconnect connection times out.  We use the ThreadingMixIn to handle
+# all of these connections simultaneously, so that the browser can actually react to the initial page
+# request and send more requests along the preconnects.
+class SelexorHTTPServer(SocketServer.ThreadingMixIn, BaseHTTPServer.HTTPServer):
   def __init__(self, address_tuple, handler_class):
     BaseHTTPServer.HTTPServer.__init__(self, address_tuple, handler_class)
     if settings.enable_https:
@@ -198,9 +210,17 @@ class SelexorHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     try:
       # Image files are binary, reading them in line mode causes corruption
       dataFile = open(filepath, 'rb')
+
+      # How long is this file?
+      dataFile.seek(0, 2)
+      data_length = dataFile.tell()
+      dataFile.seek(0, 0)
+
       # Set up webpage headers
       self.send_response(200)
       self.send_header("Content-type", self._get_mime_type_from_path(filepath))
+      self.send_header("Content-Length", str(data_length))
+
     except IOError, e:
       # Cannot find file
       logger.error(str(e))
@@ -254,7 +274,7 @@ class SelexorHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     rawdata = self.rfile.read(int(self.headers.getheader("Content-Length")))
     response = {}
     try:
-      postdict = serialize_deserializedata(rawdata)
+      postdict = serialize_repy.serialize_deserializedata(rawdata)
       action = postdict.keys()[0]
       response['action'] = action + "_response"
       if action in self.action_handlers:
@@ -275,7 +295,7 @@ class SelexorHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     self.send_response(200)
     self.end_headers()
 
-    output = serialize_serializedata(response)
+    output = serialize_repy.serialize_serializedata(response)
     self.wfile.write(output)
 
 
