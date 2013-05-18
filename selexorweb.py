@@ -283,6 +283,7 @@ class SelexorHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         raise selexorexceptions.SelexorInvalidRequest("Unknown Action: " + action)
       response['status'] = 'ok'
       response['data'] = data_to_send
+      output = serialize_repy.serialize_serializedata(response)
     except:
       # Catch all exceptions/errors that happen and log them.
       # Then tell the user an internal error occurred.
@@ -291,11 +292,12 @@ class SelexorHandler(BaseHTTPServer.BaseHTTPRequestHandler):
       data_to_send = None
       response['status'] = 'error'
       response['error'] = errstr
+
     # Send HTTP 200 OK message since this is a good request
     self.send_response(200)
+    self.send_header("Content-Length", str(len(output)))
     self.end_headers()
 
-    output = serialize_repy.serialize_serializedata(response)
     self.wfile.write(output)
 
 
@@ -343,7 +345,7 @@ class SelexorHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
   def _handle_host_request(self, data, remoteip):
     ''' Wrapper for selexor server's host request function. '''
-    return selexor_server.handle_request(data['userdata'], data['groups'], data['port'], remoteip)
+    return selexor_server.handle_request(data['userdata'], data['groups'], remoteip)
 
 
   def _handle_status_query(self, data, remoteip):
