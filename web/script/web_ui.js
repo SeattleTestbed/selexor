@@ -70,7 +70,8 @@ var RULE_DEF = {
     ]},
 }
 
-// var group_table;
+
+
 // Links group IDs to the HTML-DOM row objects
 var g_groupid_to_row;
 
@@ -279,10 +280,6 @@ jQuery.fn.clear_error = function(displaycolor) {
 */
 var init = function() {
   // Load global variables
-  group_table = $(document.getElementById("group_table")).find('tbody').get()
-  username_text = $("#username_text").get()[0]
-  authentication_button = $('#authentication_button').get()[0]
-
   g_groupid_to_row = {}
 
   // Reset everything to initial state
@@ -639,8 +636,6 @@ function convert_rules_to_string() {
       ++id
     }
   })
-  // return string;
-  console.log(requestdict)
   return requestdict;
 }
 
@@ -814,26 +809,6 @@ var send_host_request = function() {
 }
 
 
-/*
-<Purpose>
-  Wrapper for creating an option object.
-<Arguments>
-  value:
-    The value the option object should have. This is also its display value.
-<Side Effects>
-  None
-<Exceptions>
-  None
-<Returns>
-  The created option object.
-
-*/
-var create_option = function(value) {
-  var option = document.createElement("option");
-  option.appendChild(document.createTextNode(value));
-  option.value = value;
-  return option;
-}
 
 /*
 <Purpose>
@@ -853,40 +828,27 @@ var create_option = function(value) {
   None
 
 */
-var create_selection = function (option_values, option_labels) {
+var create_selection = function (option_values, option_labels, selector) {
+  if (selector === undefined)
+    var selector = $('<select>');
+  else {
+    // Wipe out the existing items within the select, otherwise we will have duplicates
+    selector.children().remove()
+  }
   if (option_labels === undefined)
     option_labels = option_values;
   if (option_labels.length != option_values.length)
     throw "The number of labels and values must be equal!"
-  var selector = document.createElement("select");
+
   for (var i = 0; i < option_values.length; ++i) {
     var new_option = document.createElement("option");
     new_option.value = option_values[i];
     new_option.textContent = option_labels[i];
-    selector.appendChild(new_option);
+    selector.append(new_option);
   }
   return selector;
 }
 
-/*
-<Purpose>
-  Adds the specified text to the end of the given node.
-<Arguments>
-  node:
-    The node to add the text to.
-  text:
-    The text that should be added.
-<Side Effects>
-  Adds a text node containing the given text into the node.
-<Exceptions>
-  None
-<Returns>
-  None
-
-*/
-function append_text(node, text) {
-  node.appendChild(document.createTextNode(text));
-};
 
 /*
 <Purpose>
@@ -904,27 +866,26 @@ function append_text(node, text) {
 */
 function create_content_cell() {
   // Drop-down for vessel count
-  var selection = document.createElement("select")
-  selection.className = "vessel_selection"
-  selection.appendChild(create_option(0));
-  selection.onfocus = function() {
-    add_vessels_until_max(selection)
-    $(selection).data('last_selected', this.selectedIndex)
-  }
-  selection.onchange = function() {
-    var delta = this.selectedIndex - $(selection).data('last_selected')
-    g_num_hosts_remaining -= delta;
-    $(selection).data('last_selected', this.selectedIndex)
-    update_remaining_host_count();
-  }
-  selection.onblur = function () {
-    remove_targets_until_selected(selection);
-  }
+  var selection = $('<select>')
+    .addClass("vessel_selection")
+    // Create the initial selection with 0 vessels
+    .append($('<option>').val(0).text(0))
+    .focus(function() {
+      add_vessels_until_max(selection)
+      $(selection).data('last_selected', this.selectedIndex)
+    })
+    .change(function() {
+      var delta = parseInt($(this).val()) - $(selection).data('last_selected')
+      g_num_hosts_remaining -= delta;
+      $(selection).data('last_selected', this.selectedIndex)
+      update_remaining_host_count();
+    })
+    .blur(function () {
+      remove_targets_until_selected(selection);
+    })
 
-  var cell = document.createElement("td");
-  append_text(cell, "Get")
-  cell.appendChild(selection)
-  append_text(cell, "vessels that")
+  var cell = $('<td>')
+        .append("Get", selection, "vessels that")
   return cell;
 }
 
@@ -952,11 +913,11 @@ function create_content_cell() {
 function create_rule_span(groupid) {
   // Allow the user to specify NOT
   var condition_negation_select = create_selection([false, true], ["are", "are not"])
-  condition_negation_select.className = 'invert_rule'
+          .addClass('invert_rule')
 
-  var span = document.createElement("span");
-  span.className = 'rule_span'
-  span.appendChild(condition_negation_select);
+  var span = $('<span>')
+        .addClass('rule_span')
+        .append(condition_negation_select)
 
   var condition_ids = IMPLEMENTED_RULES
   // The descriptions for each rule.
@@ -966,41 +927,43 @@ function create_rule_span(groupid) {
     condition_texts.push(RULE_DEF[condition_ids[condition_index]]['text'])
   }
 
-  var condition_selection = create_selection(condition_ids, condition_texts);
-  condition_selection.className = 'condition_type'
-  span.appendChild(condition_selection);
+  var condition_selection = create_selection(condition_ids, condition_texts)
+          .addClass('condition_type')
+          .append(condition_selection);
 
-  var condition_parameters = document.createElement("span")
-  condition_parameters.className = "condition_parameters"
-  condition_selection.onchange = function() {
-    var selected_condition = IMPLEMENTED_RULES[condition_selection.selectedIndex]
-    update_condition_parameters(selected_condition, condition_parameters)
-  }
+  var condition_parameters = $("<span>")
+          .addClass('condition_parameters')
+
+  condition_selection.change(function() {
+    update_condition_parameters(condition_selection.val(), condition_parameters)
+  })
 
   // Button to add a new rule span after this
-  var add_condition_button = document.createElement("input");
-  add_condition_button.type = "button";
-  add_condition_button.value = 'and';
-  add_condition_button.onclick = function() {
-    $(span).after(create_rule_span(groupid));
-  }
+  var add_condition_button = $('<button />')
+        .text('and')
+        .click(function() {
+            $(span).after(create_rule_span(groupid));
+        })
 
   // Button to remove this rule span
-  var remove_condition_button = document.createElement("input");
-  remove_condition_button.type = "button";
-  remove_condition_button.value = 'X';
-  remove_condition_button.onclick = function() {
-    if (span.parentNode.childNodes.length == 1) {
-      remove_group(groupid);
-    }
-    span.parentNode.removeChild(span);
-  }
+  var remove_condition_button = $("<button />")
+        .text('X')
+        .click(function() {
+            if (span.siblings().length == 0) {
+              remove_group(groupid);
+            }
+            span.remove()
+        })
 
-  $([add_condition_button, remove_condition_button]).addClass('condition_count_modifier').addClass('float_right');
-  span.appendChild(condition_parameters);
-  span.appendChild(remove_condition_button);
-  span.appendChild(add_condition_button);
-  condition_selection.onchange();
+  $([add_condition_button, remove_condition_button])
+      .addClass('condition_count_modifier')
+      .addClass('float_right');
+
+  span.append(condition_selection)
+      .append(condition_parameters)
+      .append(remove_condition_button)
+      .append(add_condition_button)
+  condition_selection.change();
 
   return span;
 }
@@ -1022,50 +985,53 @@ function create_rule_span(groupid) {
 
 */
 function update_condition_parameters(condition, rule_parameter_span) {
-  $(rule_parameter_span).empty()
+  rule_parameter_span.empty()
   if (RULE_DEF[condition]) {
     for (var modifiername in RULE_DEF[condition]['parameters']) {
       var modifier = RULE_DEF[condition]['parameters'][modifiername]
       switch (modifier.type) {
       case "num_range":
-        var min_input = document.createElement("input");
-        var max_input = document.createElement("input");
-        min_input.type = 'text'
-        max_input.type = 'text'
-        min_input.className = "numeric_text";
-        max_input.className = "numeric_text";
-        min_input.placeholder = modifier.placeholders[0]
-        max_input.placeholder = modifier.placeholders[1];
-        $(min_input).data('name', modifier.names[0])
-        $(max_input).data('name', modifier.names[1])
-        $(min_input).data('default_value', modifier.default_values[0])
-        $(max_input).data('default_value', modifier.default_values[1])
-        $([min_input, max_input]).numeric({'negative':false})
-                     .data("name", modifier.name);
-        append_text(rule_parameter_span, "between")
-        rule_parameter_span.appendChild(min_input);
-        rule_parameter_span.appendChild(document.createTextNode(" and "));
-        rule_parameter_span.appendChild(max_input);
+        var min_input = $("<input/>")
+              .prop('placeholder', modifier.placeholders[0])
+              .data('name', modifier.names[0])
+              .data('default_value', modifier.default_values[0])
+
+        var max_input = $("<input/>")
+              .prop('placeholder', modifier.placeholders[1])
+              .data('name', modifier.names[1])
+              .data('default_value', modifier.default_values[1])
+        
+        // Operations common to both min and max inputs
+        $([min_input, max_input]).each(function() {
+            $(this).addClass('numeric_text')
+                  .numeric({'negative':false})
+                  .data("name", modifier.name)
+          })
+
+        rule_parameter_span.append("between", min_input, "and", max_input);
         break;
 
       case "text":
       case "num_text":
-        var input = document.createElement("input");
-        input.type = 'text'
-        input.placeholder = modifier.placeholders[0]
-        $(input).data('name', modifier.names[0])
-            .data('default_value', modifier.default_values[0])
+        var input = $('<input />')
+              .prop('placeholder', modifier.placeholders[0])
+              .data('name', modifier.names[0])
+              .data('default_value', modifier.default_values[0])
         if (modifier.type == 'num_text') {
-          $(input).numeric({'negative': false});
-          input.className = "numeric_text";
+          input.numeric({'negative': false})
+              .addClass('numeric_text')
         }
-        rule_parameter_span.appendChild(input);
+        rule_parameter_span.append(input);
         break;
 
       case "select":
         var selection = create_selection(modifier.param_values, modifier.param_valuelabels);
+
+        // Select the default value
         $(selection).data('name', modifier.names[0])
-        rule_parameter_span.appendChild(selection);
+            .val(modifier.default_values);
+
+        rule_parameter_span.append(selection);
       }
 
       // Add a tooltip if it is specified in the rule definition
@@ -1112,27 +1078,6 @@ function create_release_cell(groupid) {
   return release_cell
 }
 
-/*
-<Purpose>
-  Creates a TD object that contains controls to allow users to define rules.
-<Arguments>
-  None
-<Side Effects>
-  None
-<Exceptions>
-  None
-<Returns>
-  The TD object that contains rule controls.
-
-*/
-function create_rules_cell(groupid) {
-  var cell = document.createElement("td");
-  // create_rule_span is its own function because each rule_span needs to be
-  // able to create a new rule_span.
-  var rule_span = create_rule_span(groupid);
-  cell.appendChild(rule_span);
-  return cell;
-}
 
 
 /*
@@ -1171,12 +1116,13 @@ function remove_following_siblings(node) {
 */
 var create_new_group = function() {
   var my_id = g_next_groupid;
-  var row = document.createElement("tr");
-  row.className = "group_definition"
+  var row = $('<tr>')
+        .addClass("group_definition")
 
   // Add contents cell
   var contents_cell = create_content_cell();
-  var rules_cell = create_rules_cell(my_id);
+  
+  var rules_cell = $('<td/>').append(create_rule_span(my_id))
 
   // Status cell
   var status_cell = create_status_cell(my_id)
@@ -1187,12 +1133,8 @@ var create_new_group = function() {
   $(release_cell).hide()
   $(status_cell).hide()
 
-  // BEGIN ROW CONSTRUCTION
-  row.appendChild(contents_cell);
-  row.appendChild(rules_cell);
-  row.appendChild(status_cell);
-  row.appendChild(release_cell);
-  // END ROW CONSTRUCTION
+  // Construct the row
+  row.append(contents_cell, rules_cell, status_cell, release_cell);
 
   // Insert the group row at the end of the table
   $('#group_table').append($(row).data('id', my_id))
@@ -1281,8 +1223,16 @@ function release_group(groupid) {
 
 */
 var add_vessels_until_max = function(dropdown) {
-  for (var option_no = dropdown.length; option_no < g_num_hosts_remaining + dropdown.selectedIndex + 1; ++option_no) {
-    dropdown.appendChild(create_option(option_no));
+  var selected = dropdown.val();
+  if (selected === undefined)
+    selected = 0;
+  else
+    // dropdown.val() returns a string, we need an int value
+    selected = parseInt(selected)
+
+  for (var option_no = dropdown.children().length; option_no < g_num_hosts_remaining + selected + 1; ++option_no) {
+    var option = $('<option>').val(option_no).text(option_no)
+    dropdown.append(option);
   }
 }
 
@@ -1304,9 +1254,9 @@ var add_vessels_until_max = function(dropdown) {
 
 */
 var remove_targets_until_selected = function(dropdown) {
-  var selected = dropdown.selectedIndex;
-  while (dropdown.length - 1 > selected) {
-    dropdown.removeChild(dropdown.lastChild);
+  var selected = dropdown.val()
+  while (dropdown.children().length - 1 > selected) {
+    dropdown.children().last().remove()
   }
 }
 

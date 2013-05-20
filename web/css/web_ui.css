@@ -126,7 +126,7 @@ img.tooltip_img {
 /********************************************
 Text input fields for numbers
 *********************************************/
-input[type='text'].numeric_text {
+input.numeric_text {
   width: 8ex;
 }
 /********************************************
