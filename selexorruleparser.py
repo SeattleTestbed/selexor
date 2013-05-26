@@ -441,6 +441,41 @@ def _ip_change_count_preprocessor(parameters):
   return parameters
 
 
+
+
+def _port_preprocessor(parameters):
+  '''
+  <Purpose>
+    Rule Preprocesor for port.
+
+    This is a rule callback. See the Usage section of the module docstring for more
+    information.
+  <Arguments>
+    'port': The port value that all vessels in the group must have.
+  <Exceptions>
+    ValueError
+    MissingParameter
+  <Side Effects>
+    After running:
+      port must be an int.
+
+  '''
+  required_parameters = ['port']
+  for parameter in required_parameters:
+    if parameter not in required_parameters:
+      raise selexorexceptions.MissingParameter(parameter)
+
+  for parameter in required_parameters:
+    parameters[parameter] = int(float(parameters[parameter]))
+
+  return parameters
+
+
+
+
+
+
+
 def _separation_radius_parser(cursor, invert, parameters, acquired_vessels):
   '''
   <Purpose>
@@ -571,6 +606,34 @@ def _ip_change_count_parser(handleset, database, invert, parameters):
   if invert:
     good_handles = handleset - good_handles
   return good_handles
+
+
+
+
+
+def _port_parser(cursor, invert, parameters):
+  '''
+  <Purpose>
+    Vessel-Level Rule. Ensures that all vessels in the group have the specified port number.
+
+    This is a rule callback. See the Usage section of the module docstring for more
+    information.
+  <Arguments>
+    'port': The port number that all vessels in the set must have available.
+
+  '''
+  good_handles = set()
+  port = parameters['port']
+  if not invert:
+    query = "SELECT node_id, vessel_name FROM vesselports WHERE port="+str(port)
+  else:
+    query = "SELECT node_id, vessel_name FROM vesselports WHERE port !="+str(port)
+  logger.debug(query)
+  selexorhelper.autoretry_mysql_command(cursor, query)
+  return cursor.fetchall()
+
+
+
 
 
 

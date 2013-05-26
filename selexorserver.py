@@ -319,7 +319,7 @@ class SelexorServer:
     return data
 
 
-  def resolve_node(self, identity, client, node, port, db, cursor):
+  def resolve_node(self, identity, client, node, db, cursor):
 
     # We should never run into these...
     if node['status'] == "resolved":
@@ -333,17 +333,11 @@ class SelexorServer:
     vessels_to_acquire = []
     remaining = node['allocate'] - len(node['acquired'])
 
-    selexorhelper.autoretry_mysql_command(cursor, "CREATE TEMPORARY TABLE IF NOT EXISTS valid_vessels AS (SELECT node_id, vessel_name FROM vessels)")
-    if port:
-      selexorhelper.autoretry_mysql_command(cursor, """
-        DELETE FROM valid_vessels WHERE (node_id, vessel_name) NOT IN
-        (SELECT node_id, vessel_name FROM vesselports WHERE port="""+str(port)+")")
-
-    selexorhelper.autoretry_mysql_command(cursor, "SELECT node_id, vessel_name FROM valid_vessels")
-    handles_portmatch = cursor.fetchall()
+    selexorhelper.autoretry_mysql_command(cursor, "SELECT node_id, vessel_name FROM vessels")
+    all_vessels = cursor.fetchall()
 
     # Get vessels that match the vessel rules
-    handles_vesselrulematch = selexorruleparser.apply_vessel_rules(node['rules'], cursor, handles_portmatch)
+    handles_vesselrulematch = selexorruleparser.apply_vessel_rules(node['rules'], cursor, all_vessels)
     logger.info(str(identity) + ": Vessel-level matches: " + str(len(handles_vesselrulematch)))
 
     # The number of times we tried to resolve this group in the current attempt
@@ -451,7 +445,7 @@ class SelexorServer:
     return node
 
 
-  def handle_request(self, authinfo, request, port, remoteip):
+  def handle_request(self, authinfo, request, remoteip):
     '''
     <Purpose>
       Handles a host request for the specified user.
@@ -480,8 +474,8 @@ class SelexorServer:
         Example (split across multiple lines for readability):
           0:3:location_specific,city~?,country~USA:location_different,num_locations~4,location_type~city;
           1:2:latency_average,min_latency~40ms,max_latency~200ms;
-      port:
-        The port to obtain the vessels on.
+
+      remoteip: The IP address where this request originated from.
 
     <Side Effects>
       Attempts to obtain vessels described in the request_data. This is not
@@ -526,15 +520,10 @@ class SelexorServer:
         logger.error(str(identity) + ": Error connecting to clearinghouse" + traceback.format_exc())
         raise
 
-      if port is None:
-        port = client.get_account_info()['user_port']
-      else:
-        port = int(port)
-
       # Start working
       request_data['status'] = "working"
       logger.error(str(identity) + ": Working on request")
-      resolution_thread = threading.Thread(target=self.serve_request, args=(identity, request_data, client, port))
+      resolution_thread = threading.Thread(target=self.serve_request, args=(identity, request_data, client))
       resolution_thread.start()
 
     else:
@@ -542,7 +531,7 @@ class SelexorServer:
     return self.get_request_status(authinfo, remoteip)
 
 
-  def serve_request(self, identity, request_data, client, port):
+  def serve_request(self, identity, request_data, client):
     '''
     <Purpose>
       Serves a host request.
@@ -554,8 +543,6 @@ class SelexorServer:
         A requestdict.
       client:
         The Seattle Clearinghouse XMLRPC client to use.
-      port:
-        The port that all the vessels should have.
 
     <Side Effects>
       Attempts to obtain vessels described in the request_data. This is not
@@ -589,7 +576,7 @@ class SelexorServer:
       group = request_data['groups'][next_groupname]
       try:
         logger.info(str(identity) + ": Resolving group: " + str(group))
-        group = self.resolve_node(identity, client, group, port, db, cursor)
+        group = self.resolve_node(identity, client, group, db, cursor)
       except seattleclearinghouse_xmlrpc.NotEnoughCreditsError, e:
         group['status'] = 'error'
         group['error'] = str(e)

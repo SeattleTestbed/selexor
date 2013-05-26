@@ -607,6 +607,15 @@ function convert_rules_to_string() {
     if (parseInt(vesselcount)) {
       var group_str = id + ":" + vesselcount
       var groupdict = {'id': id, 'allocate': vesselcount, 'rules': {}}
+
+      // Is the port global rule set?
+      if ($('#port_restriction').prop('checked')) {
+        // Emulate the "global" behavior by inserting the rule to every group
+        groupdict['rules']['port'] = {
+          port: $('#port_restriction_option').val(),
+        }
+      }
+
       // Add the rule definitions
       $(this).find('.rule_span').each(function() {
         var rule_str = ""
@@ -694,11 +703,13 @@ function authenticate() {
         var data = response.data
         g_max_hosts = data.max_hosts
 
-        $('#port_input_text').attr('placeholder', data.default_port);
+        $('select#port_restriction_option').val(data.default_port)
+
         if (!DEBUGGING) {
           $('#username_text, #apikey_text').attr('disabled', 1)
         }
         g_authenticated = true
+        $('.authentication_required').show()
 
         // Update the URL hash so that the user can easily login after this
         location.hash = '#username='+$('#username_text').val()+'&apikey='+$('#apikey_text').val()
@@ -756,13 +767,6 @@ var send_host_request = function() {
   requestinfo['groups'] = convert_rules_to_string()
   $('.vessel_release').hide()
   $('.status_cell').css('display', 'table-cell')
-
-  var port_input = $('#port_input_text')
-  if (!port_input.val().length) {
-    requestinfo['port'] = port_input.attr('placeholder')
-  } else {
-    requestinfo['port'] = port_input.val()
-  }
 
   var progress_image = document.createElement('img')
   progress_image.src = PROGRESS_IMAGE_SRC
@@ -940,7 +944,7 @@ function create_rule_span(groupid) {
 
   // Button to add a new rule span after this
   var add_condition_button = $('<button />')
-        .text('and')
+        .text('and ...')
         .click(function() {
             $(span).after(create_rule_span(groupid));
         })
@@ -961,8 +965,8 @@ function create_rule_span(groupid) {
 
   span.append(condition_selection)
       .append(condition_parameters)
-      .append(remove_condition_button)
       .append(add_condition_button)
+      .append(remove_condition_button)
   condition_selection.change();
 
   return span;
@@ -1293,7 +1297,7 @@ var remove_group = function(groupid) {
   None
 <Side Effects>
   Attaches event callbacks onto form elements:
-    Username, API key, port input fields
+    Username, API key
     Add New Group button
   Triggers initial error checking to start up in an invalid request state to
     prevent user from submitting an incomplete request.
@@ -1319,17 +1323,19 @@ var setup_form = function() {
         validate_apikey()
     })
 
-  $("input#port_input_text")
-    .numeric({'negative':false})
-    // We don't know the user's default port on initialization
-    // This placeholder will be changed when the user authenticates.
-    .prop("placeholder", "Default port")
-
   $("#num_hosts_remaining")
     .bind('blur', function() {
       update_send_request_button()
   })
 
+  // Prepare the port restriction selection
+  var valid_ports = generate_numeric_list(63100, 63180)
+  create_selection(valid_ports, valid_ports, $('#port_restriction_option'))
+
+  // Enable port selection by default
+  $('#port_restriction').prop('checked', true)
+
+  $('.authentication_required').hide()
 
   $("input#new_group_button").bind('click', function() {
       create_new_group()
@@ -1428,16 +1434,17 @@ function update_send_request_button() {
     $('#vessel_acquire_button').clear_error(null)
   }
   if (isEmpty(g_request_errors))
-    $("#acquire_capsule").addClass('request_ready')
+    $("#acquire_capsule").show()
+        .addClass('request_ready')
   else
-    $("#acquire_capsule").removeClass('request_ready')
+    $("#acquire_capsule").hide()
+        .removeClass('request_ready')
 }
 
 
 var attach_tooltips = function() {
   $("#username_tooltip").addTooltip("This is your Username that is associated with the Clearinghouse.");
   $("#apikey_tooltip").addTooltip("A 32-character API key is required to allow SeleXor to perform actions on your behalf. <br />You can obtain this by visiting your Clearinghouse by clicking on this tooltip.");
-  $("#port_tooltip").addTooltip("All acquired vessels will have this port open.<br/>Leave it blank to use your assigned Clearinghouse port.")
 }
 
 
@@ -1447,6 +1454,18 @@ function preload() {
   progress_img.style.display = 'none'
   document.getElementsByTagName('body')[0].appendChild(progress_img)
 }
+
+
+
+/* Generates a list of numbers, inclusive of the lower bound, exclusive the upper bound */
+function generate_numeric_list(start, end) {
+  var list = new Array();
+  for (var i = start; i < end; ++i) {
+    list.push(i)
+  }
+  return list;
+}
+
 
 
 

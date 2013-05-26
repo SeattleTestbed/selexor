@@ -45,6 +45,11 @@ div.capsule {
 	background-color: #CCCCCC;
 }
 
+.inline {
+  display: inline-block;
+}
+
+
 /********************************************
 Fixes the (!) tooltip jumping to the next line on Chrome.
 *********************************************/
@@ -85,17 +90,19 @@ tr.group_definition:nth-child(2n+1) {
 	margin-bottom: 2px;
 }
 
-/********************************************
-Capsule containing the send host request button.
-*********************************************/
-#acquire_capsule {
-  display: inline-block;
-}
-
 h2 {
 	font-size:20px;	
 	margin: 1px;
 }
+
+
+/********************************************
+Provide some whitespace after the port rules
+*********************************************/
+.port_rule {
+  margin-bottom: 18px;
+}
+
 
 /********************************************
 Adds space around select and input objects
@@ -108,10 +115,19 @@ that are inside a group definition.
 }
 
 /********************************************
+Provide some whitespace before the acquire button begins
+*********************************************/
+#acquire_capsule {
+  margin-top: 18px;
+}
+
+
+
+/********************************************
 Style to use when the request is ready to be 
 sent to the server.
 *********************************************/
-div.request_ready {
+div.request_ready div.inline.capsule {
 	background-color: #009000;
 }
 

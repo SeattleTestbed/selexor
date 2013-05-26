@@ -28,34 +28,39 @@
       </td>
 			<td><input type="text" class="authentication_input" id="apikey_text" /></td>
 		</tr>
-		<tr>
-			<td id="port_input_label">Port Requested<span id="port_tooltip"></span></td>
-			<td><input type="text" class='request_input' id="port_input_text" /></td>
-		</tr>
 		</table>
 		<span id="authentication_span">
     <input type="button" id="authentication_button" value="Authenticate" /></span>
     <img id='authentication_progress' src='./images/progress.gif' alt='Authentication in progress...' hidden='true' />
     <span id='authentication_errtext'></span>
   <!-- Group Definitions -->
-	<div class="capsule">
-		<h2 id="group_label">Groups</h2>	
-		<table id="group_table">
-			<tr id='hosts_remaining_row'>
-        <td>
-          <span id="hosts_remaining_span">
-            <span class="request_input" id="num_hosts_remaining">?</span> vessels remaining!
-          </span>
-        </td>
-			</tr>
-		</table>
-		<input id='new_group_button' type="button" value="New Group"/>
-	</div>
-  <!-- Group Definitions -->
-		<div class="capsule" id="acquire_capsule">
-      <input id="vessel_acquire_button" type="button" value="Send Request" />
-      <span id="vessel_acquire_errtext"></span>
-		</div>
+
+    <div class='authentication_required'>
+      <hr />
+
+      <div class='port_rule'>
+        <input type='checkbox' id='port_restriction' />Only acquire vessels with port <select id='port_restriction_option'></select>
+      </div>
+      
+      <table id="group_table">
+        <tr id='hosts_remaining_row'>
+          <td>
+            <span id="hosts_remaining_span">
+              <span class="request_input" id="num_hosts_remaining">?</span> vessels remaining!
+            </span>
+          </td>
+        </tr>
+      </table>
+      <input id='new_group_button' type="button" value="New Group"/>
+    <!-- Group Definitions -->
+      <div id="acquire_capsule">
+        <hr />
+        <div class="inline capsule">
+          <input id="vessel_acquire_button" type="button" value="Send Request" />
+          <span id="vessel_acquire_errtext"></span>
+        </div>
+      </div>
+    </div>
 	</div>
 </body>
 </html>
