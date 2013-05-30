@@ -51,6 +51,7 @@ CREATE TABLE `vesselports` (
   `node_id` int(11) NOT NULL,
   `vessel_name` varchar(45) NOT NULL,
   `port` varchar(45) NOT NULL,
+  PRIMARY KEY (`node_id`, `vessel_name`, `port`),
   KEY `vesselport_foreignkey_idx` (`node_id`,`vessel_name`),
   CONSTRAINT `vesselport_foreignkey` FOREIGN KEY (`node_id`, `vessel_name`) REFERENCES `vessels` (`node_id`, `vessel_name`) ON DELETE NO ACTION ON UPDATE NO ACTION
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
