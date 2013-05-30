@@ -20,7 +20,7 @@ CREATE TABLE `nodes` (
   `last_ip_change` datetime NOT NULL,
   `last_seen` datetime NOT NULL,
   PRIMARY KEY (`node_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=23235 DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB AUTO_INCREMENT=0 DEFAULT CHARSET=latin1;
 
 
 
