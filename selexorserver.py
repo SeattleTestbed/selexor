@@ -107,36 +107,6 @@ FINISHED_PROCESSING_STATUSES = ['resolved', 'failed', 'error']
 STATUSES_TO_SKIP = FINISHED_PROCESSING_STATUSES + ['incomplete']
 
 
-
-def _get_next_group_to_resolve(requestdict):
-  '''
-  <Purpose>
-    Given a requestdict, returns the next group that the program should resolve.
-  <Arguments>
-    requestdict:
-      A dictionary representing a user's request.
-  <Exceptions>
-    None
-  <Side Effects>
-    None
-  <Returns>
-    The next node that should be resolved.
-    Returns None if there are no more nodes to resolve.
-
-  '''
-  min_rulecount = 2 ** 32  # Should be as large as possible
-  next_group = None
-
-  for groupname in requestdict['groups']:
-    group = requestdict['groups'][groupname]
-    if  group['status'] not in STATUSES_TO_SKIP and \
-        len(group['rules']) < min_rulecount:
-      next_group = groupname
-      min_rulecount = len(group['rules'])
-  return next_group
-
-
-
 class SelexorServer:
   def __init__(self):
     '''
@@ -381,6 +351,7 @@ class SelexorServer:
         vessel_dict = {
           'handle': handle,
           'node_id': node_id,
+          'node_key': nodekey,
           'vessel_name': vesselname,
         }
         candidate_vessels.append(vessel_dict)
@@ -414,24 +385,46 @@ class SelexorServer:
           # in the next iteration
           logger.info(str(identity) + ": Releasing: " + str(worst_vessel))
           candidate_vessels.remove(worst_vessel)
-          client.release_resources([worst_vessel])
-    if candidate_vessels:
+          client.release_resources([worst_vessel['handle']])
+
+    # We may get vessels that are unusable (i.e. extra vessels containing
+    # leftover resources).  If so, drop them and try again
+    while candidate_vessels:
       vessels_to_acquire = []
       for vesseldict in candidate_vessels:
         vessels_to_acquire.append(vesseldict['handle'])
 
       try:
         acquired_vesseldicts = client.acquire_specific_vessels(vessels_to_acquire)
-        logger.info(str(identity)+": Requested "+str(len(vessels_to_acquire))+" vessels, acquired "+str(len(acquired_vesseldicts))+":\n"+str(acquired_vesseldicts))
-        node['acquired'] = candidate_vessels
+        logger.info(str(identity)+": Requested "+str(len(vessels_to_acquire))+" vessels, acquired "+str(len(acquired_vesseldicts))+":\n"+'\n'.join(i['handle'][-10:] +':'+ i['vessel_id'] for i in acquired_vesseldicts))
+        node['acquired'] += candidate_vessels
+        break
+
       except seattleclearinghouse_xmlrpc.NotEnoughCreditsError, e:
         logger.error(str(identity) + ": Not enough vessel credits")
         raise
       except seattleclearinghouse_xmlrpc.InvalidRequestError, e:
-        logger.error(str(identity) + ": " + str(e))
-        raise
+        error_string = str(e)
+        # This may be an extra vessel.
+        if 'There is no vessel with the node identifier' in error_string:
+          logger.error(str(identity) + ": " + str(e))
+          extra_vessels = []
+          for vessel in candidate_vessels:
+            if (vessel['node_key'] in error_string and
+                vessel['vessel_name'] in error_string):
+              extra_vessels.append(vessel)
+
+          for vessel in extra_vessels:
+            candidate_vessels.remove(vessel)
+            logger.info("Removing: ..." + vessel['node_key'][-10:] + ':' + vessel['vessel_name'])
+
+        else:
+          logger.error(str(identity) + ": " + str(e))
+          raise
+
       except Exception, e:
         logger.error(str(identity) +": Unknown error while acquiring vessels\n" + traceback.format_exc())
+        pdb.set_trace()
         raise selexorexceptions.SelexorInternalError(str(e))
 
     node['pass'] += 1
@@ -562,42 +555,30 @@ class SelexorServer:
 
     '''
     logger.info(str(identity) + ": Request data:\n" + str(request_data))
-    incomplete_groups = copy.copy(request_data['groups'])
-    next_groupname = _get_next_group_to_resolve(request_data)
-
     db, cursor = selexorhelper.connect_to_db()
 
-    # Start processing loop
-    while   incomplete_groups and\
-            next_groupname is not None:
-      # If the server shutting down, stop processing.
-      if not self._running:
-        break
-      group = request_data['groups'][next_groupname]
-      try:
-        logger.info(str(identity) + ": Resolving group: " + str(group))
-        group = self.resolve_node(identity, client, group, db, cursor)
-      except seattleclearinghouse_xmlrpc.NotEnoughCreditsError, e:
-        group['status'] = 'error'
-        group['error'] = str(e)
-        logger.info(str(identity) + ": Not enough credits.")
-        request_data['status'] = 'error'
-        return
-      except:
-        group['status'] = 'error'
-        group['error'] = "An internal error occured while resolving this group."
-        logger.error(str(identity) + ": Unknown error while resolving nodes\n" + traceback.format_exc())
-        request_data['status'] = 'error'
-        return
-      if group['status'] in FINISHED_PROCESSING_STATUSES:
-        logger.info(str(identity) + ": Group finished processing with status: " + str(group['status']))
-        incomplete_groups.pop(group['id'])
-      if not incomplete_groups:
-        for group in request_data['groups'].values():
-          if group['status'] == ['incomplete']:
-            group['status'] = 'unresolved'
-      # Get the next
-      next_groupname = _get_next_group_to_resolve(request_data)
+    for groupname, group in request_data['groups'].iteritems():
+      pass_no = 0
+      while pass_no < 5:
+        try:
+          logger.info(str(identity) + ": Resolving group: " + str(groupname))
+          group = self.resolve_node(identity, client, group, db, cursor)
+          break
+
+        except seattleclearinghouse_xmlrpc.NotEnoughCreditsError, e:
+          group['status'] = 'error'
+          group['error'] = str(e)
+          logger.info(str(identity) + ": Not enough credits.")
+          request_data['status'] = 'error'
+          return
+        except:
+          group['status'] = 'error'
+          group['error'] = "An internal error occured while resolving this group."
+          logger.error(str(identity) + ": Unknown error while resolving nodes\n" + traceback.format_exc())
+          request_data['status'] = 'error'
+          return
+
+        pass_no += 1
 
     logger.info(str(identity) + ": Resolution Complete")
     request_data['status'] = 'complete'
