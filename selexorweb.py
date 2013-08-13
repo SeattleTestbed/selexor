@@ -75,11 +75,6 @@ def main():
   global logger
   # Needed so that the event handler for the HTTP server can see the selexor server
   global selexor_server
-  if len(sys.argv) != 2:
-    print "Unexpected arguments!"
-    print 'Usage: $ python selexorweb.py [instance name]'
-    return
-
   logger = selexorhelper.setup_logging("selexorweb")
 
   # Generate the index file
