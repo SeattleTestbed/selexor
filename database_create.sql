@@ -27,6 +27,7 @@ CREATE TABLE `nodes` (
 CREATE TABLE `vessels` (
   `node_id` int(11) NOT NULL,
   `vessel_name` varchar(5) NOT NULL,
+  `acquirable` boolean DEFAULT TRUE,
   PRIMARY KEY (`node_id`,`vessel_name`),
   CONSTRAINT `node_id` FOREIGN KEY (`node_id`) REFERENCES `nodes` (`node_id`) ON DELETE NO ACTION ON UPDATE NO ACTION
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;

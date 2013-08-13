@@ -53,14 +53,23 @@
     A string indicating a group's current status.
     It can have the following values:
 
-    'resolved': The group has finished processing.
-    'incomplete': The group has not finished processing, and has not been
-                  processed on the active pass.
-    'unresolved': The group has not finished processing, but has already been
-                  processed on the active pass.
-    'failed': The group could not be completed, because the number of passes
-              attempted has exceeded the maximum allowed limit.
-    'error': The group could not be completed because of some unexpected error.
+    STATUS_RESOLVED:
+      The group has finished processing.
+
+    STATUS_INCOMPLETE:
+      The group has not finished processing, and has not been processed
+      on the active pass.
+
+    STATUS_UNRESOLVED:
+      The group has not finished processing, but has already been
+      processed on the active pass.
+
+    STATUS_FAILED:
+      The group could not be completed, because the number of passes
+      attempted has exceeded the maximum allowed limit.
+
+    STATUS_ERROR:
+      The group could not be completed because of some unexpected error.
 
   ruledict:
     A dictionary representing the rules that a group should follow. See the
@@ -103,8 +112,11 @@ request_datum = {}
 MAX_PASSES_PER_NODE = 5
 
 
-FINISHED_PROCESSING_STATUSES = ['resolved', 'failed', 'error']
-STATUSES_TO_SKIP = FINISHED_PROCESSING_STATUSES + ['incomplete']
+STATUS_RESOLVED = 'resolved'
+STATUS_FAILED = 'failed'
+STATUS_INCOMPLETE = 'incomplete'
+STATUS_ERROR = 'error'
+STATUS_UNRESOLVED = 'unresolved'
 
 
 class SelexorServer:
@@ -292,10 +304,10 @@ class SelexorServer:
   def resolve_node(self, identity, client, node, db, cursor):
 
     # We should never run into these...
-    if node['status'] == "resolved":
+    if node['status'] == STATUS_RESOLVED:
       logger.error(str(identity) + ": Group already resolved: " + str(node))
       return node
-    elif node['status'] == 'failed':
+    elif node['status'] == STATUS_FAILED:
       logger.error(str(identity) + ": Exceeded pass limit: " + str(node))
       return node
 
@@ -303,7 +315,7 @@ class SelexorServer:
     vessels_to_acquire = []
     remaining = node['allocate'] - len(node['acquired'])
 
-    selexorhelper.autoretry_mysql_command(cursor, "SELECT node_id, vessel_name FROM vessels")
+    selexorhelper.autoretry_mysql_command(cursor, "SELECT node_id, vessel_name FROM vessels WHERE acquirable")
     all_vessels = cursor.fetchall()
 
     # Get vessels that match the vessel rules
@@ -418,6 +430,21 @@ class SelexorServer:
             candidate_vessels.remove(vessel)
             logger.info("Removing: ..." + vessel['node_key'][-10:] + ':' + vessel['vessel_name'])
 
+          # Store into the db so that future lookups do not need to
+          # spend time acquiring the vessel to discover that it is not
+          # acquirable, as there are no definitive ways of determining
+          # if a vessel is non-acquirable, aside from the management
+          # vessel (v2)
+          update_command = ("UPDATE vessels SET acquirable=false \
+            WHERE (node_id, vessel_name) IN (" +
+              ", ".join( "(%s, '%s')" % (handle['node_id'], handle['vessel_name'])
+                for handle in extra_vessels
+              ) +
+            ")")
+
+          selexorhelper.autoretry_mysql_command(cursor, update_command)
+          db.commit()
+
         else:
           logger.error(str(identity) + ": " + str(e))
           raise
@@ -430,11 +457,11 @@ class SelexorServer:
     node['pass'] += 1
     if node['pass'] >= MAX_PASSES_PER_NODE:
       logger.info(str(identity) + ": Group exceeds pass limit. Designating group as failed: " + str(node))
-      node['status'] = 'failed'
+      node['status'] = STATUS_FAILED
     elif len(node['acquired']) == node['allocate']:
-      node['status'] = 'resolved'
+      node['status'] = STATUS_RESOLVED
     else:
-      node['status'] = 'incomplete'
+      node['status'] = STATUS_INCOMPLETE
     return node
 
 
@@ -563,7 +590,10 @@ class SelexorServer:
         try:
           logger.info(str(identity) + ": Resolving group: " + str(groupname))
           group = self.resolve_node(identity, client, group, db, cursor)
-          break
+          # We are done here, no need to proceed with the remaining
+          # passes
+          if group['status'] != STATUS_INCOMPLETE:
+            break
 
         except seattleclearinghouse_xmlrpc.NotEnoughCreditsError, e:
           group['status'] = 'error'
@@ -612,7 +642,7 @@ class SelexorServer:
       new_group = {
           'id': groupid,
           'rules': {},
-          'status': 'unresolved',
+          'status': STATUS_UNRESOLVED,
           'allocate': int(groupdata['allocate']),
           'acquired': [],
           'pass': 0,
