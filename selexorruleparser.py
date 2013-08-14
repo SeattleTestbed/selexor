@@ -365,7 +365,7 @@ def _specific_location_parser(cursor, invert, parameters):
 
   query = """SELECT node_id, vessel_name FROM 
       (SELECT ip_addr FROM location WHERE """+condition+""") as valid_ips
-      LEFT JOIN nodes USING (ip_addr) LEFT JOIN valid_vessels USING (node_id)"""
+      LEFT JOIN nodes USING (ip_addr) LEFT JOIN vessels USING (node_id)"""
   logger.debug(query)
   cursor.execute(query)
   return cursor.fetchall()
