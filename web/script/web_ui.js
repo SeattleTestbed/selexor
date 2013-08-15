@@ -1057,8 +1057,11 @@ function update_condition_parameters(condition, rule_parameter_span) {
       }
 
       // Add a tooltip if it is specified in the rule definition
-      if (modifier.tooltip)
-        $(rule_parameter_span.lastChild).addTooltip(modifier.tooltip, "info");
+      if (modifier.tooltip) {
+        rule_parameter_span.addTooltip(modifier.tooltip, "info");
+      } else {
+        rule_parameter_span.removeTooltip();
+      }
     }
   }
 }
