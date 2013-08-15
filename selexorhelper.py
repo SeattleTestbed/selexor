@@ -20,13 +20,21 @@ import seattleclearinghouse_xmlrpc
 import MySQLdb
 import logging
 import settings
+import socket
 
 helpercontext = {}
 
 initialized_loggers = {}
 logger = None
 
+testbed_ip_list = []
 
+NODE_TESTBED = "testbed"
+NODE_UNIVERSITY = "university"
+NODE_HOME = "home"
+NODE_UNKNOWN = "unknown"
+
+VALID_NODETYPES = [NODE_TESTBED, NODE_UNIVERSITY, NODE_HOME, NODE_UNKNOWN]
 
 def is_ipv4_address(ipstring):
   ''' Checks if the given string is a valid IPv4 address. '''
@@ -95,6 +103,46 @@ def initialize():
   # This takes up too much memory...
   # helpercontext['CITY_TO_ID'] = load_ids('city')
 
+  testbed_ip_lines = open('lookup/testbed_iplist.txt').readlines()
+  testbed_ip_list.extend(ip_addr.strip() for ip_addr in testbed_ip_lines)
+
+
+def get_node_type(ip_addr):
+  '''
+  <Purpose>
+    Returns the type of the node specified.
+  <Arguments>
+    ip_addr:
+      The IP address of the node in question.
+  <Exceptions>
+    None
+  <Side Effects>
+    None
+  <Return>
+    A string representing the type of the node.
+
+  '''
+  if ip_addr in testbed_ip_list:
+    return NODE_TESTBED
+
+  domain_name = socket.getfqdn(ip_addr)
+
+  # Is this a university node?
+  academic_url_parts = ['edu', 'uni', 'uvic.ca', 'tuwien.ac.at']
+  matches = [part for part in academic_url_parts if part in domain_name]
+  if matches:
+    return NODE_UNIVERSITY
+
+  # Is this a home node?
+  home_url_parts = [ 'dsl', 'dial', 'dyn', 'cable', 'comcast', 'qwest',
+    'pool', 'cust', 'broad', 'cox.net', 'netvigator', 'telering', 'rr.com',
+    'triband', 'surfer', 'wayport', 'highway.a1'
+    ]
+  matches = [part for part in home_url_parts if part in domain_name]
+  if matches:
+    return NODE_HOME
+
+  return NODE_UNKNOWN
 
 
 def get_city_id(cityname):

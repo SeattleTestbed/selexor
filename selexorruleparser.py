@@ -441,6 +441,32 @@ def _ip_change_count_preprocessor(parameters):
   return parameters
 
 
+def _node_type_preprocessor(parameters):
+  '''
+  <Purpose>
+    Rule Preprocesor for node_type.
+
+    This is a rule callback. See the Usage section of the module docstring for more
+    information.
+  <Arguments>
+    'node_type':
+      The type of nodes that the user wants.
+      This should be a value in selexorhelper.VALID_NODETYPES.
+  <Exceptions>
+    MissingParameter
+  <Side Effects>
+    None
+
+  '''
+  required_parameters = ['node_type']
+
+  if 'node_type' not in parameters:
+    raise selexorexceptions.MissingParameter(parameter)
+  if parameters['node_type'] not in selexorhelper.VALID_NODETYPES:
+    raise selexorexceptions.BadParameter(parameters['node_type']+" must be a\
+      value in "+str(selexorhelper.VALID_NODETYPES))
+
+  return parameters
 
 
 def _port_preprocessor(parameters):
@@ -608,7 +634,35 @@ def _ip_change_count_parser(handleset, database, invert, parameters):
   return good_handles
 
 
+def _node_type_parser(cursor, invert, parameters):
+  '''
+  <Purpose>
+    Vessel-Level Rule. Ensures that all vessels in the group are of the
+    specified type.
 
+    This is a rule callback. See the Usage section of the module
+    docstring for more information.
+  <Arguments>
+    'node_type':
+      The node type to filter.
+      This should be a value in selexorhelper.VALID_NODETYPES.
+
+  '''
+  good_handles = set()
+  node_type = parameters['node_type']
+  if not invert:
+    query = (
+      "SELECT node_id, vessel_name FROM vessels WHERE node_id IN "
+      "(SELECT node_id FROM nodes WHERE node_type='"+node_type+"')"
+      )
+  else:
+    query = (
+      "SELECT node_id, vessel_name FROM vessels WHERE node_id IN "
+      "(SELECT node_id FROM nodes WHERE node_type!='"+node_type+"')"
+      )
+
+  selexorhelper.autoretry_mysql_command(cursor, query)
+  return cursor.fetchall()
 
 
 def _port_parser(cursor, invert, parameters):
@@ -718,6 +772,7 @@ def _init():
   register_callback('location_separation_radius', 'group', _separation_radius_parser, _separation_radius_preprocessor)
   register_callback('location_different', 'group', _different_location_type_parser, _different_location_preprocessor)
   register_callback('num_ip_change', 'vessel', _ip_change_count_parser, _ip_change_count_preprocessor)
+  register_callback('node_type', 'vessel', _node_type_parser, _node_type_preprocessor)
   register_callback('port', 'vessel', _port_parser, _port_preprocessor)
 
 

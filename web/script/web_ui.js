@@ -29,7 +29,14 @@ var CONTENT_TOOLTIPS = {
   "Get Vessels": 'The number of vessels to obtain.',
   "Include Other Groups": "Groups to apply this condition to.<br /><select><option>N/A</option></select> indicates that there is no target.<br />Press the <input type='button' value='+' /> button to add more targets.<br />Press the <input type='button' value='-' /> button to remove the last target. Does nothing if there is only one target left."
 }
-var IMPLEMENTED_RULES = ["None", "location_specific", "location_different", "location_separation_radius"]
+var IMPLEMENTED_RULES = [
+  "None",
+  "location_specific",
+  "location_different",
+  "location_separation_radius",
+  'node_type',
+  ]
+
 var RULE_DEF = {
   "None": {
     'text':"of any type",
@@ -68,6 +75,17 @@ var RULE_DEF = {
     'parameters':[
       {'type': 'num_range', 'names': ['min_radius', 'max_radius'], 'placeholders': [0, Infinity], 'default_values': [0, Infinity], 'tooltip': "The distance from every vessel to every other vessel must be within the specified range.<br />Valid units: m, km (default), mi"}
     ]},
+  "node_type": {
+    'text': 'running on',
+    'parameters':[
+      {
+        'type': 'select',
+        'names': ['node_type'],
+        /*'default_values': null, */ 
+        'param_values': ['testbed', 'university', 'home', 'unknown'],
+        'param_valuelabels': ['testbeds', 'universities', 'homes', 'unknown']
+      }],
+    }
 }
 
 

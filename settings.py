@@ -64,6 +64,11 @@ allow_ssl_insecure = False
 # Default is 10 minutes.
 probe_delay = 10 * 60
 
+# If set to True, the node type will be refreshed every time a node is
+# seen, regardless of if it is needed or not.  Otherwise, only refresh
+# the node type when the node's IP address changes.
+# This is useful when changing the way node types are determined.
+force_refresh_node_type = False
 
 """
 Database Configurations

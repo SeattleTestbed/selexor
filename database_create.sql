@@ -16,6 +16,7 @@ CREATE TABLE `nodes` (
   `node_id` int(11) NOT NULL AUTO_INCREMENT,
   `node_key` text NOT NULL,
   `node_port` int(11) NOT NULL,
+  `node_type` varchar(15) NOT NULL DEFAULT 'unknown',
   `ip_addr` varchar(15) NOT NULL,
   `last_ip_change` datetime NOT NULL,
   `last_seen` datetime NOT NULL,

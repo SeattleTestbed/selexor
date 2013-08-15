@@ -216,9 +216,12 @@ def commit_data_to_database(db, cursor, node_ip, node_port, node_dict, ports, ge
   new_node = selexorhelper.autoretry_mysql_command(cursor, "SELECT node_id FROM nodes WHERE node_key='"+nodekeystr+"'") == 0L
 
   if new_node:
+    node_type = selexorhelper.get_node_type(node_ip)
     # Node isn't recognized, add it to the db
-    cmd = ("INSERT INTO nodes (node_key, ip_addr, node_port, last_ip_change, last_seen) "+
-          "VALUES ('%s', '%s', %i, NOW(), NOW())") % (nodekeystr, node_ip, node_port)
+    cmd = ("INSERT INTO nodes " +
+      "(node_key, ip_addr, node_port, node_type, last_ip_change, last_seen) " +
+      "VALUES ('%s', '%s', %i, '%s', NOW(), NOW())" % (nodekeystr, node_ip, node_port, node_type)
+      )
     selexorhelper.autoretry_mysql_command(cursor, cmd)
 
     # Now retrieve the internal node_id.
@@ -242,8 +245,18 @@ def commit_data_to_database(db, cursor, node_ip, node_port, node_dict, ports, ge
     # Did the IP address change?  If so mark that down.
     selexorhelper.autoretry_mysql_command(cursor, "SELECT (ip_addr) FROM nodes WHERE node_key='"+nodekeystr+"'")
     old_node_ip = cursor.fetchone()[0]
-    if node_ip != old_node_ip:
-      cmd = "UPDATE nodes SET ip_addr='%s', last_ip_change=NOW() WHERE node_id=%i" % (node_ip, node_id)
+    node_ip_changed = node_ip != old_node_ip
+    if node_ip_changed:
+      cmd = (
+        "UPDATE nodes SET ip_addr='%s', last_ip_change=NOW() WHERE node_id=%i" %
+          (node_ip, node_id)
+        )
+      selexorhelper.autoretry_mysql_command(cursor, cmd)
+
+    # Update the node type if necessary
+    if node_ip_changed or settings.force_refresh_node_type:
+      node_type = selexorhelper.get_node_type(node_ip)
+      cmd = "UPDATE nodes SET node_type='%s' WHERE node_id=%i" % (node_type, node_id)
       selexorhelper.autoretry_mysql_command(cursor, cmd)
 
     # Update the last time we saw the node.
