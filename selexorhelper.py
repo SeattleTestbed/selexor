@@ -127,20 +127,22 @@ def get_node_type(ip_addr):
 
   domain_name = socket.getfqdn(ip_addr)
 
-  # Is this a university node?
-  academic_url_parts = ['edu', 'uni', 'uvic.ca', 'tuwien.ac.at']
-  matches = [part for part in academic_url_parts if part in domain_name]
-  if matches:
-    return NODE_UNIVERSITY
+  # Use URL components like .edu, planetlab, etc. to identify where a
+  # node is running from.
+  node_type_urlparts = {
+    NODE_TESTBED: ['planet', 'lab', 'silicon-valley.ru'],
+    NODE_UNIVERSITY: ['edu', 'uni', '.ca', '.hk', 'ac.jp', 'ac.kr', 'ac.be',
+      'epfl', 'ece', 'tuwien.ac.at', 'unavarra.es', 'uam.es', 'unl.pt',
+      'opole.pl', 'tu.koszalin.pl', 'p.lodz.pl', 'tu-harburg.de'],
+    NODE_HOME: ['dsl', 'dial', 'dyn', 'cable', 'comcast', 'qwest', 'pool',
+      'cust', 'broad', 'cox.net', 'netvigator', 'telering', 'rr.com', 'triband',
+      'surfer', 'wayport', 'highway.a1']
+  }
 
-  # Is this a home node?
-  home_url_parts = [ 'dsl', 'dial', 'dyn', 'cable', 'comcast', 'qwest',
-    'pool', 'cust', 'broad', 'cox.net', 'netvigator', 'telering', 'rr.com',
-    'triband', 'surfer', 'wayport', 'highway.a1'
-    ]
-  matches = [part for part in home_url_parts if part in domain_name]
-  if matches:
-    return NODE_HOME
+  for node_type, urlparts in node_type_urlparts.iteritems():
+    matches = [part for part in urlparts if part in domain_name]
+    if matches:
+      return node_type
 
   return NODE_UNKNOWN
 
