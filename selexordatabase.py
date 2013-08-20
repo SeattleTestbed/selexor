@@ -87,7 +87,9 @@ def format_geoinfo(geoinfo):
 def probe_for_vessels():
   print "Probing for vessels..."
   # Look up as many values as possible
-  nodes_to_check = advertise_lookup(nodestate_transition_key, maxvals=2**32)
+  # Careful not to go *too* high, as we'll run into an overflow error
+  maxvals = 2 ** 16
+  nodes_to_check = advertise_lookup(nodestate_transition_key, maxvals=maxvals)
   logger.info("Found " +str(len(nodes_to_check))+ " nodes")
 
   update_threads = []
