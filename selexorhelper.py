@@ -97,6 +97,7 @@ def get_node_ip_port_from_nodelocation(nodelocation):
 
 
 def initialize():
+  global acquirable_vessel_resources
   global logger
   logger = setup_logging(__name__)
   helpercontext['COUNTRY_TO_ID'] = load_ids('country')
@@ -105,6 +106,42 @@ def initialize():
 
   testbed_ip_lines = open('lookup/testbed_iplist.txt').readlines()
   testbed_ip_list.extend(ip_addr.strip() for ip_addr in testbed_ip_lines)
+
+  resources_file = settings.path_to_seattle_trunk + '/seattlegeni/node_state_transitions/resource_files/twopercent.resources'
+  restrictions_file = settings.path_to_seattle_trunk + '/resource/vessel.restrictions'
+  resources = open(resources_file).readlines()
+  resources.extend(open(restrictions_file).readlines())
+
+  acquirable_vessel_resources = set()
+  for line in resources:
+    line = line.strip()
+    if line and 'port' not in line:
+      acquirable_vessel_resources.add(line)
+
+
+def is_resource_acquirable(resource_string):
+  '''
+  <Purpose>
+    Given a resource string, determine if the resource can be acquired
+    by a user.
+  <Arguments>
+    resource_string:
+      A string describing a file's restrictions and resources.
+      Obtainable via GetVesselResources via the nodemanager.
+  <Side Effects>
+    None
+  <Exceptions>
+    None
+  <Returns>
+    True if the resource is acquirable, False otherwise.
+  '''
+  resources_without_ports = []
+  for line in resource_string.split('\n'):
+    line = line.strip()
+    if line and 'port' not in line:
+      resources_without_ports.append(line)
+
+  return set(resources_without_ports) == acquirable_vessel_resources
 
 
 def get_node_type(ip_addr):

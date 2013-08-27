@@ -162,11 +162,12 @@ def contact_vessels_and_update_database(nodes_to_check):
       node_nmhandle = nmclient_createhandle(nodeinfo['id'], nodeinfo['port'])
       node_dict = nmclient_getvesseldict(node_nmhandle)
 
-      # Retrieve the ports for each vessel
       ports = {}
       for vesselname in node_dict['vessels']:
         resources_string = nmclient_rawsay(node_nmhandle, "GetVesselResources", vesselname)
         ports[vesselname] = selexorhelper.get_ports_from_resource_string(resources_string)
+        node_dict['vessels'][vesselname]['acquirable'] = \
+          selexorhelper.is_resource_acquirable(resources_string)
 
       # Retrieve the geographic information
       try:
@@ -316,12 +317,13 @@ def update_vessels_table(cursor, node_id, vessel_dict):
 
   if vessel_dict:
     # IGNORE keyword is to tell MySQL to ignore vessels that already exist.
-    query = 'INSERT IGNORE INTO vessels (node_id, vessel_name) VALUES'
+    query = 'INSERT IGNORE INTO vessels (node_id, vessel_name, acquirable) VALUES'
     for vessel_name in vessel_dict:
       # v2 can never be used... No sense in tracking it in the vessel database.
       if vessel_name == 'v2':
         continue
-      query += " ('"+str(node_id)+"', '"+vessel_name+"'),"
+      acquirable = vessel_dict[vessel_name]['acquirable']
+      query += " ('"+str(node_id)+"', '"+vessel_name+"', "+str(acquirable)+"),"
     # Get rid of the trailing comma after the last tuple
     query = query.strip(',')
     selexorhelper.autoretry_mysql_command(cursor, query)
