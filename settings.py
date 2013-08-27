@@ -34,7 +34,8 @@ path_to_ssl_certificate = 'server.crt'
 # with the certificate provided above.
 path_to_ssl_key = 'server.key'
 
-
+# The root to the local Seattle SVN repository.
+path_to_seattle_trunk = '/path/to/seattle/trunk'
 
 # The number of threads to use to probe
 # Set this to 1 to disable threading.
