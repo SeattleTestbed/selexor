@@ -83,7 +83,13 @@ var RULE_DEF = {
         'names': ['node_type'],
         /*'default_values': null, */ 
         'param_values': ['testbed', 'university', 'home', 'unknown'],
-        'param_valuelabels': ['testbeds', 'universities', 'homes', 'unknown']
+        'param_valuelabels': ['testbeds', 'universities', 'homes', 'unknown'],
+        'tooltip': (
+          'Filters out vessels based on the type of node they reside on.' +
+          '<br /><br />' +
+          "Node types are approximate, based on the node's fully qualified " +
+          "domain name. Please consult SeleXor's wiki for more information."
+          )
       }],
     }
 }
