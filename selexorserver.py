@@ -741,12 +741,13 @@ def _get_acquired_vesseldicts(clearinghouse_vesseldicts, selexor_vesseldicts):
     A list of selexor internal vesseldicts that belong to the vessels
     that were actually acquired.
   """
-  selexor_handles = []
-  for vesseldict in selexor_vesseldicts:
-    selexor_handles.append(vesseldict['handle'])
+  clearinghouse_handles = []
+  for vesseldict in clearinghouse_vesseldicts:
+    clearinghouse_handles.append(vesseldict['handle'])
 
   retlist = []
-  for vesseldict in clearinghouse_vesseldicts:
-    if vesseldict['handle'] in selexor_handles:
+  for vesseldict in selexor_vesseldicts:
+    handle = vesseldict['handle']
+    if handle in clearinghouse_handles and not vesseldict in retlist:
       retlist.append(vesseldict)
   return retlist
