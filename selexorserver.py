@@ -451,7 +451,6 @@ class SelexorServer:
 
       except Exception, e:
         logger.error(str(identity) +": Unknown error while acquiring vessels\n" + traceback.format_exc())
-        pdb.set_trace()
         raise selexorexceptions.SelexorInternalError(str(e))
 
     node['pass'] += 1
