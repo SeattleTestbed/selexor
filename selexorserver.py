@@ -409,7 +409,15 @@ class SelexorServer:
       try:
         acquired_vesseldicts = client.acquire_specific_vessels(vessels_to_acquire)
         logger.info(str(identity)+": Requested "+str(len(vessels_to_acquire))+" vessels, acquired "+str(len(acquired_vesseldicts))+":\n"+'\n'.join(i['handle'][-10:] +':'+ i['vessel_id'] for i in acquired_vesseldicts))
-        node['acquired'] += candidate_vessels
+
+        # We must be careful to count only the vessels that we have
+        # actually acquired, as some vessels may not have been given to
+        # the user due to the database having slightly outdated
+        # information.
+        acquired_vesseldicts = _get_acquired_vesseldicts(
+          clearinghouse_vesseldicts=acquired_vesseldicts,
+          selexor_vesseldicts=candidate_vessels)
+        node['acquired'] += acquired_vesseldicts
         break
 
       except seattleclearinghouse_xmlrpc.NotEnoughCreditsError, e:
@@ -710,3 +718,35 @@ def get_handle_from_nodehandle(nodehandle):
     fastnmclient.nmclient_destroyhandle(nmhandle)
   return rsa_publickey_to_string(vesseldict['nodekey']) + ':' + vesselname
 
+
+def _get_acquired_vesseldicts(clearinghouse_vesseldicts, selexor_vesseldicts):
+  """
+  <Purpose>
+    Checks which vessels are actually acquired, between the vessels
+    that were requested and the vessels that are actually acquired.
+
+  <Arguments>
+    clearinghouse_vesseldicts:
+      The list of vesseldicts returned from the SeattleClearinghouseClient.
+    selexor_vesseldicts:
+      The list of vesseldicts that are used in SeleXor internally.
+
+  <Side Effects>
+    None
+
+  <Exceptions>
+    None
+
+  <Returns>
+    A list of selexor internal vesseldicts that belong to the vessels
+    that were actually acquired.
+  """
+  selexor_handles = []
+  for vesseldict in selexor_vesseldicts:
+    selexor_handles.append(vesseldict['handle'])
+
+  retlist = []
+  for vesseldict in clearinghouse_vesseldicts:
+    if vesseldict['handle'] in selexor_handles:
+      retlist.append(vesseldict)
+  return retlist
