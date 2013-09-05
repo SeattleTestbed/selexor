@@ -397,7 +397,6 @@ def update_ports_table(cursor, node_id, ports):
 
     if vessels_to_remove:
       query = 'DELETE FROM vesselports WHERE node_id='+str(node_id)+' AND vessel_name in ('+', '.join(vessels_to_remove)+')'
-      logger.debug("Vessel no longer exists: removing from ports table "+str(node_id)+":"+vessel_name+": "+ query)
       selexorhelper.autoretry_mysql_command(cursor, query)
 
 
@@ -420,7 +419,6 @@ def update_ports_table(cursor, node_id, ports):
 
     if ports_to_remove:
       query = 'DELETE FROM vesselports WHERE (node_id, vessel_name)=('+str(node_id)+', "'+vessel_name+'") AND port in ('+', '.join(ports_to_remove)+')'
-      logger.debug("Removing ports on vessel "+str(node_id)+":"+vessel_name+": "+ query)
       selexorhelper.autoretry_mysql_command(cursor, query)
 
 
@@ -432,7 +430,6 @@ def update_ports_table(cursor, node_id, ports):
         query += " ('"+str(node_id)+"', '"+vessel_name+"', "+str(port)+"),"
       # Get rid of the trailing comma after the last tuple
       query = query.strip(',')
-      logger.debug("Adding ports on vessel "+str(node_id)+":"+vessel_name+": "+ query)
       selexorhelper.autoretry_mysql_command(cursor, query)
 
 
