@@ -215,6 +215,7 @@ class SelexorHandler(BaseHTTPServer.BaseHTTPRequestHandler):
       self.send_response(200)
       self.send_header("Content-type", self._get_mime_type_from_path(filepath))
       self.send_header("Content-Length", str(data_length))
+      self.send_header("Connection", "Close")
 
     except IOError, e:
       # Cannot find file
@@ -291,6 +292,7 @@ class SelexorHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     # Send HTTP 200 OK message since this is a good request
     self.send_response(200)
     self.send_header("Content-Length", str(len(output)))
+    self.send_header("Connection", "Close")
     self.end_headers()
 
     self.wfile.write(output)
